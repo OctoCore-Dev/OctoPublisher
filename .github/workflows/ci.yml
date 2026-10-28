@@ -100,6 +100,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -111,12 +112,18 @@ jobs:
           dotnet nuget add source --username "${{ github.actor }}" --password "${{ secrets.GITHUB_TOKEN }}" --store-password-in-clear-text --name "github" "https://nuget.pkg.github.com/OctoCore-Dev/index.json"
           dotnet nuget push "release-artifacts/octopublisher-nuget/*.nupkg" --source "github" --api-key "${{ secrets.GITHUB_TOKEN }}" --skip-duplicate
 
+      - name: NuGet Login (Trusted Publishing OIDC)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: irovbyte
+
       - name: Publish to NuGet.org
-        if: env.NUGET_API_KEY != ''
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          dotnet nuget push "release-artifacts/octopublisher-nuget/*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
+          dotnet nuget push "release-artifacts/octopublisher-nuget/*.nupkg" \
+            --source "https://api.nuget.org/v3/index.json" \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+            --skip-duplicate
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
