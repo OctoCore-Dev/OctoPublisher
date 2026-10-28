@@ -13,8 +13,13 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/OctoCore-Dev/OctoPublisher</PackageProjectUrl>
     <RepositoryUrl>https://github.com/OctoCore-Dev/OctoPublisher</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>microsoft-store;msstore;windows;packaging;msix;ci-cd;google-play</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Octo.Common\Octo.Common.csproj" />
