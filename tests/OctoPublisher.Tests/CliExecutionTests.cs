@@ -56,4 +56,28 @@ public sealed class CliExecutionTests
 
         Assert.Equal(1, exitCode);
     }
+
+    [Theory]
+    [InlineData("playstore")]
+    [InlineData("playstore", "--help")]
+    [InlineData("playstore", "-h")]
+    public async Task MainReturnsZeroWhenPlayStoreHelpRequestedAsync(params string[] args)
+    {
+        var exitCode = await Program.Main(args);
+        Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
+    public async Task MainReturnsOneWhenUnknownPlayStoreSubcommandAsync()
+    {
+        var exitCode = await Program.Main(["playstore", "unsupported-action"]);
+        Assert.Equal(1, exitCode);
+    }
+
+    [Fact]
+    public async Task MainReturnsTwoWhenPlayStorePublishMissingRequiredFlagsAsync()
+    {
+        var exitCode = await Program.Main(["playstore", "publish"]);
+        Assert.Equal(2, exitCode);
+    }
 }

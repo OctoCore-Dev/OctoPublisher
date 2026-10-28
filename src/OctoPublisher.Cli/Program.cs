@@ -22,7 +22,7 @@ public static class Program
             return primaryCommand switch
             {
                 "mstore" => await RunMStoreCommandAsync(args.AsSpan(1).ToArray()),
-                "playstore" => await RunPlayStoreCommandAsync(),
+                "playstore" => await RunPlayStoreCommandAsync(args.AsSpan(1).ToArray()),
                 _ => HandleUnknownCommand(primaryCommand)
             };
         }
@@ -98,38 +98,31 @@ public static class Program
         Console.Write($"{AnsiTerminal.Accent}[?]{AnsiTerminal.Reset} {prompt}: ");
         if (isSecret)
         {
-            return ReadPassword();
+            var pwd = new StringBuilder();
+            while (true)
+            {
+                var key = Console.ReadKey(intercept: true);
+                if (key.Key == ConsoleKey.Enter)
+                {
+                    Console.WriteLine();
+                    break;
+                }
+                if (key.Key == ConsoleKey.Backspace && pwd.Length > 0)
+                {
+                    _ = pwd.Remove(pwd.Length - 1, 1);
+                }
+                else if (!char.IsControl(key.KeyChar))
+                {
+                    _ = pwd.Append(key.KeyChar);
+                }
+            }
+            return pwd.ToString();
         }
 
-        var input = Console.ReadLine();
+        var input = Console.ReadLine()?.Trim();
         return string.IsNullOrWhiteSpace(input) && !isOptional
-            ? throw new ArgumentException($"Required parameter '{flagName}' cannot be empty.")
-            : input?.Trim() ?? string.Empty;
-    }
-
-    private static string ReadPassword()
-    {
-        var pass = new System.Text.StringBuilder();
-        while (true)
-        {
-            var key = Console.ReadKey(true);
-            if (key.Key == ConsoleKey.Enter)
-            {
-                Console.WriteLine();
-                break;
-            }
-            if (key.Key == ConsoleKey.Backspace && pass.Length > 0)
-            {
-                _ = pass.Remove(pass.Length - 1, 1);
-                Console.Write("\b \b");
-            }
-            else if (!char.IsControl(key.KeyChar))
-            {
-                _ = pass.Append(key.KeyChar);
-                Console.Write("*");
-            }
-        }
-        return pass.ToString();
+            ? throw new ArgumentException($"Missing required configuration parameter: {flagName}")
+            : input ?? string.Empty;
     }
 
     private static async Task<int> HandleMStorePublishAsync(
@@ -137,9 +130,11 @@ public static class Program
         MStoreCredentials credentials,
         Dictionary<string, string> flags)
     {
+        AnsiTerminal.Header("Microsoft Store Publishing");
+
         if (!flags.TryGetValue("package", out var packagePath) || string.IsNullOrWhiteSpace(packagePath))
         {
-            AnsiTerminal.Error("Missing required flag: --package <path-to-file>");
+            AnsiTerminal.Error("Missing required flag: --package <path to .msix/.zip>");
             return 1;
         }
 
@@ -239,11 +234,77 @@ public static class Program
         return 1;
     }
 
-    private static Task<int> RunPlayStoreCommandAsync()
+    private static async Task<int> RunPlayStoreCommandAsync(string[] args)
     {
-        AnsiTerminal.Header("Google Play Store Module");
-        AnsiTerminal.Info("Google Play Store module stub loaded. Ready for implementation.");
-        return Task.FromResult(0);
+        if (args.Length == 0 || args[0] is "-h" or "--help")
+        {
+            PrintPlayStoreHelp();
+            return 0;
+        }
+
+        var action = args[0].ToLowerInvariant();
+        var flags = ParseFlags(args.AsSpan(1).ToArray());
+
+        return action switch
+        {
+            "publish" => await HandlePlayStorePublishAsync(flags),
+            _ => UnknownSubcommand("playstore", action)
+        };
+    }
+
+    private static async Task<int> HandlePlayStorePublishAsync(Dictionary<string, string> flags)
+    {
+        AnsiTerminal.Header("Google Play Store Publishing");
+
+        var bundlePath = flags.GetValueOrDefault("bundle") ?? flags.GetValueOrDefault("package");
+        if (string.IsNullOrWhiteSpace(bundlePath))
+        {
+            AnsiTerminal.Error("Missing required flag: --bundle <path> (path to .aab or .apk)");
+            return 2;
+        }
+
+        var packageName = flags.GetValueOrDefault("package-name")
+            ?? Environment.GetEnvironmentVariable("PLAY_PACKAGE_NAME");
+        if (string.IsNullOrWhiteSpace(packageName))
+        {
+            AnsiTerminal.Error("Missing required flag: --package-name <id> (or PLAY_PACKAGE_NAME env)");
+            return 2;
+        }
+
+        var serviceAccount = flags.GetValueOrDefault("service-account")
+            ?? Environment.GetEnvironmentVariable("PLAY_CONFIG_JSON")
+            ?? Environment.GetEnvironmentVariable("PLAY_SERVICE_ACCOUNT_JSON");
+        if (string.IsNullOrWhiteSpace(serviceAccount))
+        {
+            AnsiTerminal.Error("Missing required flag: --service-account <path or json> (or PLAY_CONFIG_JSON env)");
+            return 2;
+        }
+
+        var track = flags.GetValueOrDefault("track")
+            ?? Environment.GetEnvironmentVariable("PLAY_TRACK")
+            ?? "internal";
+
+        var notes = flags.GetValueOrDefault("notes");
+        var notesDir = flags.GetValueOrDefault("notes-dir");
+        var desc = flags.GetValueOrDefault("desc");
+        var descDir = flags.GetValueOrDefault("desc-dir");
+        var icon = flags.GetValueOrDefault("icon");
+        var releaseName = flags.GetValueOrDefault("release-name");
+
+        var publisher = new PlayStorePublisher();
+        var result = await publisher.PublishAsync(
+            bundleOrApkPath: bundlePath,
+            packageName: packageName,
+            serviceAccountInput: serviceAccount,
+            track: track,
+            notesPath: notes,
+            notesDir: notesDir,
+            descPath: desc,
+            descDir: descDir,
+            iconPath: icon,
+            releaseName: releaseName);
+
+        return result.ExitCode;
     }
 
     private static int HandleUnknownCommand(string command)
@@ -289,7 +350,7 @@ public static class Program
         Console.WriteLine("  -v, --version  Show version information");
         Console.WriteLine("  -h, --help     Show help information");
         Console.WriteLine();
-        Console.WriteLine("Run 'octopublish mstore --help' for Microsoft Store commands.");
+        Console.WriteLine("Run 'octopublish mstore --help' or 'octopublish playstore --help'.");
     }
 
     private static void PrintMStoreHelp()
@@ -315,6 +376,26 @@ public static class Program
         Console.WriteLine();
         Console.WriteLine("Configure Options:");
         Console.WriteLine("  --local                 Save to current directory (.octopublish.json) instead of user home");
+        Console.WriteLine();
+    }
+
+    private static void PrintPlayStoreHelp()
+    {
+        AnsiTerminal.Header("OctoPublisher: Google Play Store Module");
+        Console.WriteLine("Commands:");
+        Console.WriteLine("  publish       Upload AAB or APK, assign track, update listings and commit release");
+        Console.WriteLine();
+        Console.WriteLine("Publish Options:");
+        Console.WriteLine("  --bundle <path>           Path to .aab or .apk package (Required)");
+        Console.WriteLine("  --package-name <id>       Android application ID (Fallback: PLAY_PACKAGE_NAME env)");
+        Console.WriteLine("  --service-account <path>  Path to service account JSON or JSON content (Fallback: PLAY_CONFIG_JSON env)");
+        Console.WriteLine("  --track <name>            Target release track: internal, alpha, beta, production (Default: internal)");
+        Console.WriteLine("  --notes <path>            Path to single release notes text file");
+        Console.WriteLine("  --notes-dir <path>        Directory containing localized notes (whatsnew-ru-RU, etc.)");
+        Console.WriteLine("  --desc <path>             Path to single store description file");
+        Console.WriteLine("  --desc-dir <path>         Directory containing localized descriptions (packaging/store/...)");
+        Console.WriteLine("  --icon <path>             Path to 512x512 PNG app icon");
+        Console.WriteLine("  --release-name <name>     Custom release title / version name");
         Console.WriteLine();
     }
 }
