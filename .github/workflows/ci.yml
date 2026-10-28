@@ -66,6 +66,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Publish Single-File Binary
+        shell: bash
         run: |
           dotnet publish src/OctoPublisher.Cli/OctoPublisher.Cli.csproj \
             -c Release \
@@ -75,14 +76,14 @@ jobs:
             -p:PublishTrimmed=false \
             -o dist
 
-      - name: Rename Artifact (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Move-Item dist/octopublish.exe dist/${{ matrix.output_name }}
-
-      - name: Rename Artifact (Unix)
-        if: runner.os != 'Windows'
-        run: mv dist/octopublish dist/${{ matrix.output_name }}
+      - name: Rename Artifact
+        shell: bash
+        run: |
+          if [ -f dist/octopublish.exe ]; then
+            mv dist/octopublish.exe dist/${{ matrix.output_name }}
+          else
+            mv dist/octopublish dist/${{ matrix.output_name }}
+          fi
 
       - name: Upload Standalone Binary
         uses: actions/upload-artifact@v4
