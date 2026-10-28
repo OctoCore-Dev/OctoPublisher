@@ -6,6 +6,7 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -92,8 +93,8 @@ jobs:
           path: dist/${{ matrix.output_name }}
 
   release:
-    name: Create GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    name: Create GitHub Release & Publish Packages
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: [build-and-test, build-standalone]
     runs-on: ubuntu-latest
     permissions:
@@ -104,6 +105,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
+
+      - name: Publish to GitHub Packages
+        run: |
+          dotnet nuget add source --username "${{ github.actor }}" --password "${{ secrets.GITHUB_TOKEN }}" --store-password-in-clear-text --name "github" "https://nuget.pkg.github.com/OctoCore-Dev/index.json"
+          dotnet nuget push "release-artifacts/octopublisher-nuget/*.nupkg" --source "github" --api-key "${{ secrets.GITHUB_TOKEN }}" --skip-duplicate
+
+      - name: Publish to NuGet.org
+        if: env.NUGET_API_KEY != ''
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push "release-artifacts/octopublisher-nuget/*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
