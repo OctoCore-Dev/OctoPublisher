@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Octo.Common/Octo.Common.csproj" />
+    <Project Path="src/Octo.MStore/Octo.MStore.csproj" />
+    <Project Path="src/Octo.PlayStore/Octo.PlayStore.csproj" />
+    <Project Path="src/OctoPublisher.Cli/OctoPublisher.Cli.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OctoPublisher.Tests/OctoPublisher.Tests.csproj" />
+  </Folder>
+</Solution>

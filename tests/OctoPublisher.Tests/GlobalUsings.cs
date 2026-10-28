@@ -1,0 +1,12 @@
+global using System.Net;
+global using System.Text;
+global using Octo.Common.Logging;
+global using Octo.Common.Models;
+global using Octo.MStore.Auth;
+global using Octo.MStore.Client;
+global using Octo.MStore.Metadata;
+global using Octo.MStore.Models;
+global using Octo.MStore.Storage;
+global using OctoPublisher.Cli;
+global using OctoPublisher.Tests.Helpers;
+global using Xunit;

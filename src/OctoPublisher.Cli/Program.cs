@@ -1,0 +1,320 @@
+namespace OctoPublisher.Cli;
+
+public static class Program
+{
+    public static async Task<int> Main(string[] args)
+    {
+        if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
+        {
+            PrintHelp();
+            return 0;
+        }
+
+        if (args[0] is "-v" or "--version" or "version")
+        {
+            AnsiTerminal.Info("OctoPublisher CLI v1.0.0 (.NET 10)");
+            return 0;
+        }
+
+        var primaryCommand = args[0].ToLowerInvariant();
+        try
+        {
+            return primaryCommand switch
+            {
+                "mstore" => await RunMStoreCommandAsync(args.AsSpan(1).ToArray()),
+                "playstore" => await RunPlayStoreCommandAsync(),
+                _ => HandleUnknownCommand(primaryCommand)
+            };
+        }
+        catch (Exception ex)
+        {
+            AnsiTerminal.Error($"Fatal error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    private static async Task<int> RunMStoreCommandAsync(string[] args)
+    {
+        if (args.Length == 0 || args[0] is "-h" or "--help")
+        {
+            PrintMStoreHelp();
+            return 0;
+        }
+
+        var action = args[0].ToLowerInvariant();
+        var flags = ParseFlags(args.AsSpan(1).ToArray());
+
+        if (action == "configure")
+        {
+            return HandleMStoreConfigure(flags);
+        }
+
+        var credentials = MStoreCredentials.Load(
+            flags.GetValueOrDefault("tenant-id"),
+            flags.GetValueOrDefault("client-id"),
+            flags.GetValueOrDefault("client-secret"),
+            flags.GetValueOrDefault("app-id"),
+            flags.GetValueOrDefault("seller-id"));
+
+        var client = new MStoreClient();
+
+        return action switch
+        {
+            "publish" => await HandleMStorePublishAsync(client, credentials, flags),
+            "status" => await HandleMStoreStatusAsync(client, credentials),
+            "delete-draft" => await HandleMStoreDeleteDraftAsync(client, credentials),
+            _ => UnknownSubcommand("mstore", action)
+        };
+    }
+
+    private static int HandleMStoreConfigure(Dictionary<string, string> flags)
+    {
+        AnsiTerminal.Header("Microsoft Store Configuration Setup");
+
+        var tenantId = PromptOrFlag(flags, "tenant-id", "Enter Azure AD Tenant ID");
+        var clientId = PromptOrFlag(flags, "client-id", "Enter Azure AD Client ID");
+        var clientSecret = PromptOrFlag(flags, "client-secret", "Enter Azure AD Client Secret", isSecret: true);
+        var appId = PromptOrFlag(flags, "app-id", "Enter Microsoft Store App ID");
+        var sellerId = PromptOrFlag(flags, "seller-id", "Enter Partner Center Seller ID (optional)", isOptional: true);
+
+        var isLocal = flags.ContainsKey("local");
+
+        var creds = new MStoreCredentials(tenantId, clientId, clientSecret, appId, string.IsNullOrWhiteSpace(sellerId) ? null : sellerId);
+        MStoreCredentials.SaveConfig(creds, isLocal);
+
+        var targetFile = isLocal ? ".octopublish.json" : "~/.octo/mstore.json";
+        AnsiTerminal.Success($"Configuration saved successfully to {targetFile}");
+        AnsiTerminal.Info("You can now run 'octopublish mstore publish --package <path>' without credential flags.");
+        return 0;
+    }
+
+    private static string PromptOrFlag(Dictionary<string, string> flags, string flagName, string prompt, bool isSecret = false, bool isOptional = false)
+    {
+        if (flags.TryGetValue(flagName, out var val) && !string.IsNullOrWhiteSpace(val))
+        {
+            return val;
+        }
+
+        Console.Write($"{AnsiTerminal.Accent}[?]{AnsiTerminal.Reset} {prompt}: ");
+        if (isSecret)
+        {
+            return ReadPassword();
+        }
+
+        var input = Console.ReadLine();
+        return string.IsNullOrWhiteSpace(input) && !isOptional
+            ? throw new ArgumentException($"Required parameter '{flagName}' cannot be empty.")
+            : input?.Trim() ?? string.Empty;
+    }
+
+    private static string ReadPassword()
+    {
+        var pass = new System.Text.StringBuilder();
+        while (true)
+        {
+            var key = Console.ReadKey(true);
+            if (key.Key == ConsoleKey.Enter)
+            {
+                Console.WriteLine();
+                break;
+            }
+            if (key.Key == ConsoleKey.Backspace && pass.Length > 0)
+            {
+                _ = pass.Remove(pass.Length - 1, 1);
+                Console.Write("\b \b");
+            }
+            else if (!char.IsControl(key.KeyChar))
+            {
+                _ = pass.Append(key.KeyChar);
+                Console.Write("*");
+            }
+        }
+        return pass.ToString();
+    }
+
+    private static async Task<int> HandleMStorePublishAsync(
+        MStoreClient client,
+        MStoreCredentials credentials,
+        Dictionary<string, string> flags)
+    {
+        if (!flags.TryGetValue("package", out var packagePath) || string.IsNullOrWhiteSpace(packagePath))
+        {
+            AnsiTerminal.Error("Missing required flag: --package <path-to-file>");
+            return 1;
+        }
+
+        Dictionary<string, string>? notesByLang = null;
+        if (flags.TryGetValue("notes-dir", out var notesDir))
+        {
+            notesByLang = MStoreListingManager.LoadDirectoryFiles(notesDir);
+        }
+
+        Dictionary<string, string>? descByLang = null;
+        if (flags.TryGetValue("desc-dir", out var descDir))
+        {
+            descByLang = MStoreListingManager.LoadDirectoryFiles(descDir);
+        }
+
+        string? defaultNotes = null;
+        if (flags.TryGetValue("notes", out var notesFile) && File.Exists(notesFile))
+        {
+            defaultNotes = await File.ReadAllTextAsync(notesFile);
+        }
+
+        string? defaultDesc = null;
+        if (flags.TryGetValue("desc", out var descFile) && File.Exists(descFile))
+        {
+            defaultDesc = await File.ReadAllTextAsync(descFile);
+        }
+
+        var result = await client.PublishAsync(
+            credentials,
+            packagePath,
+            notesByLang,
+            descByLang,
+            defaultNotes,
+            defaultDesc);
+
+        return result.ExitCode;
+    }
+
+    private static async Task<int> HandleMStoreStatusAsync(
+        MStoreClient client,
+        MStoreCredentials credentials)
+    {
+        AnsiTerminal.Header("Microsoft Store Status Inspection");
+        var tokenService = new MStoreTokenService();
+        var token = await tokenService.GetAccessTokenAsync(credentials);
+
+        var app = await client.GetApplicationAsync(credentials.AppId, token, CancellationToken.None);
+        AnsiTerminal.Detail("Application Name", app.PrimaryName ?? "None");
+        AnsiTerminal.Detail("App ID", app.Id ?? credentials.AppId);
+
+        if (app.LastPublishedApplicationSubmission != null)
+        {
+            AnsiTerminal.Detail("Last Published Submission", app.LastPublishedApplicationSubmission.Id ?? "None");
+        }
+
+        if (app.PendingApplicationSubmission != null && !string.IsNullOrWhiteSpace(app.PendingApplicationSubmission.Id))
+        {
+            var subId = app.PendingApplicationSubmission.Id;
+            var sub = await client.GetSubmissionAsync(credentials.AppId, subId, token, CancellationToken.None);
+            AnsiTerminal.Detail("Active Pending Submission", subId);
+            AnsiTerminal.Detail("Status", sub?.Status ?? "Unknown");
+        }
+        else
+        {
+            AnsiTerminal.Info("No pending submissions active.");
+        }
+
+        return 0;
+    }
+
+    private static async Task<int> HandleMStoreDeleteDraftAsync(
+        MStoreClient client,
+        MStoreCredentials credentials)
+    {
+        AnsiTerminal.Header("Microsoft Store Draft Cleanup");
+        var tokenService = new MStoreTokenService();
+        var token = await tokenService.GetAccessTokenAsync(credentials);
+
+        var app = await client.GetApplicationAsync(credentials.AppId, token, CancellationToken.None);
+        if (app.PendingApplicationSubmission == null || string.IsNullOrWhiteSpace(app.PendingApplicationSubmission.Id))
+        {
+            AnsiTerminal.Info("No pending draft submission found to delete.");
+            return 0;
+        }
+
+        var subId = app.PendingApplicationSubmission.Id;
+        AnsiTerminal.Step("Delete", $"Attempting to delete pending draft submission: {subId}");
+
+        var deleted = await client.DeleteSubmissionAsync(credentials.AppId, subId, token, CancellationToken.None);
+        if (deleted)
+        {
+            AnsiTerminal.Success($"Draft submission {subId} deleted successfully.");
+            return 0;
+        }
+
+        AnsiTerminal.Error($"Failed to delete submission {subId}. It may already be in Certification or Release status.");
+        return 1;
+    }
+
+    private static Task<int> RunPlayStoreCommandAsync()
+    {
+        AnsiTerminal.Header("Google Play Store Module");
+        AnsiTerminal.Info("Google Play Store module stub loaded. Ready for implementation.");
+        return Task.FromResult(0);
+    }
+
+    private static int HandleUnknownCommand(string command)
+    {
+        AnsiTerminal.Error($"Unknown command: {command}");
+        PrintHelp();
+        return 1;
+    }
+
+    private static int UnknownSubcommand(string module, string subcmd)
+    {
+        AnsiTerminal.Error($"Unknown {module} subcommand: {subcmd}");
+        return 1;
+    }
+
+    private static Dictionary<string, string> ParseFlags(string[] args)
+    {
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (arg.StartsWith("--", StringComparison.Ordinal))
+            {
+                var key = arg[2..];
+                dict[key] = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal) ? args[++i] : "true";
+            }
+        }
+        return dict;
+    }
+
+    private static void PrintHelp()
+    {
+        AnsiTerminal.Header("OctoPublisher CLI");
+        Console.WriteLine("Universal multi-store deployment automation engine for OctoCore applications.");
+        Console.WriteLine();
+        Console.WriteLine("Usage: octopublish <module> <action> [options]");
+        Console.WriteLine();
+        Console.WriteLine("Available Modules:");
+        Console.WriteLine("  mstore     Microsoft Store (Windows MSIX / AppX submissions)");
+        Console.WriteLine("  playstore  Google Play Store (Android AAB / APK releases)");
+        Console.WriteLine();
+        Console.WriteLine("Global Options:");
+        Console.WriteLine("  -v, --version  Show version information");
+        Console.WriteLine("  -h, --help     Show help information");
+        Console.WriteLine();
+        Console.WriteLine("Run 'octopublish mstore --help' for Microsoft Store commands.");
+    }
+
+    private static void PrintMStoreHelp()
+    {
+        AnsiTerminal.Header("OctoPublisher: Microsoft Store Module");
+        Console.WriteLine("Commands:");
+        Console.WriteLine("  publish       Upload package, update metadata, and commit submission to certification");
+        Console.WriteLine("  status        Inspect current application and pending submission status");
+        Console.WriteLine("  delete-draft  Delete uncommitted draft submission if stuck in PendingCommit");
+        Console.WriteLine("  configure     Save credentials locally to ~/.octo/mstore.json or .octopublish.json");
+        Console.WriteLine();
+        Console.WriteLine("Publish Options:");
+        Console.WriteLine("  --package <path>        Path to .msix, .msixupload, or .zip archive (Required)");
+        Console.WriteLine("  --app-id <id>           Store Product ID (Fallback: STORE_APP_ID secret)");
+        Console.WriteLine("  --tenant-id <id>        Azure AD Tenant ID (Fallback: STORE_TENANT_ID secret)");
+        Console.WriteLine("  --client-id <id>        Azure AD Client ID (Fallback: STORE_CLIENT_ID secret)");
+        Console.WriteLine("  --client-secret <sec>   Azure AD Client Secret (Fallback: STORE_CLIENT_SECRET secret)");
+        Console.WriteLine("  --seller-id <id>        Partner Center Seller ID (Fallback: SELLER_ID secret)");
+        Console.WriteLine("  --notes <path>          Path to single release notes text file");
+        Console.WriteLine("  --notes-dir <path>      Directory containing localized notes (whatsnew-ru-RU, etc.)");
+        Console.WriteLine("  --desc <path>           Path to single store description file");
+        Console.WriteLine("  --desc-dir <path>       Directory containing localized descriptions");
+        Console.WriteLine();
+        Console.WriteLine("Configure Options:");
+        Console.WriteLine("  --local                 Save to current directory (.octopublish.json) instead of user home");
+        Console.WriteLine();
+    }
+}

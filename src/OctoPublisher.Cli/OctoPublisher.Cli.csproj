@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>OctoPublisher.Cli</RootNamespace>
+    <AssemblyName>octopublish</AssemblyName>
+    
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>octopublish</ToolCommandName>
+    <PackageId>OctoPublisher</PackageId>
+    <Version>1.0.0</Version>
+    <Description>High-performance universal multi-store publishing CLI for modern CI/CD and local terminals.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/OctoCore-Dev/OctoPublisher</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/OctoCore-Dev/OctoPublisher</RepositoryUrl>
+    <PackageTags>microsoft-store;msstore;windows;packaging;msix;ci-cd;google-play</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Octo.Common\Octo.Common.csproj" />
+    <ProjectReference Include="..\Octo.MStore\Octo.MStore.csproj" />
+    <ProjectReference Include="..\Octo.PlayStore\Octo.PlayStore.csproj" />
+  </ItemGroup>
+</Project>
