@@ -12,7 +12,8 @@ public static class Program
 
         if (args[0] is "-v" or "--version" or "version")
         {
-            AnsiTerminal.Info("OctoPublisher CLI v1.0.0 (.NET 10)");
+            var ver = typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "1.0.1";
+            AnsiTerminal.Info($"OctoPublisher CLI v{ver} (.NET 10)");
             return 0;
         }
 

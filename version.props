@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <AppVersion>1.0.1</AppVersion>
+    <AppBuildNumber>1</AppBuildNumber>
+    <Version>$(AppVersion)</Version>
+    <PackageVersion>$(AppVersion)</PackageVersion>
+    <AssemblyVersion>$(AppVersion).0</AssemblyVersion>
+    <FileVersion>$(AppVersion).0</FileVersion>
+    <InformationalVersion>$(AppVersion)</InformationalVersion>
+  </PropertyGroup>
+</Project>

@@ -8,8 +8,9 @@ public sealed class MStoreTokenServiceTests
         var mockResponse = new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(
-                                     /*lang=json,strict*/
-                                     """{"access_token":"mock_access_token_12345","token_type":"Bearer","expires_in":"3600"}""",
+
+                                                                               /*lang=json,strict*/
+                                                                               """{"access_token":"mock_access_token_12345","token_type":"Bearer","expires_in":"3600"}""",
                 Encoding.UTF8,
                 "application/json")
         };
@@ -37,8 +38,9 @@ public sealed class MStoreTokenServiceTests
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                                         /*lang=json,strict*/
-                                         """{"access_token":"cached_token_abc","token_type":"Bearer","expires_in":"3600"}""",
+
+                                                                                   /*lang=json,strict*/
+                                                                                   """{"access_token":"cached_token_abc","token_type":"Bearer","expires_in":"3600"}""",
                     Encoding.UTF8,
                     "application/json")
             };
@@ -63,8 +65,9 @@ public sealed class MStoreTokenServiceTests
         var handler = new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadRequest)
         {
             Content = new StringContent(
-                                     /*lang=json,strict*/
-                                     """{"error":"invalid_client","error_description":"Invalid client secret provided"}""",
+
+                                                                               /*lang=json,strict*/
+                                                                               """{"error":"invalid_client","error_description":"Invalid client secret provided"}""",
                 Encoding.UTF8,
                 "application/json")
         });

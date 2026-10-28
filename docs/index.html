@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OctoPublisher — Universal Multi-Store Publishing Engine</title>
   <meta name="description" content="High-performance universal multi-store publishing CLI for modern CI/CD and local terminals.">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2360cdff'><path d='M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5a1.5 1.5 0 1 1-3 0V9.91l-1.8 1.8a1.5 1.5 0 1 1-2.12-2.12l4.4-4.4a1.5 1.5 0 0 1 2.12 0l4.4 4.4a1.5 1.5 0 0 1-2.12 2.12L13 9.91z'/></svg>">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
   <style>
     :root {
       --mica-canvas: #202020;
@@ -570,9 +570,7 @@
   <!-- TitleBar (44px) -->
   <header class="titlebar">
     <div class="titlebar-left">
-      <svg class="titlebar-logo" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5a1.5 1.5 0 1 1-3 0V9.91l-1.8 1.8a1.5 1.5 0 1 1-2.12-2.12l4.4-4.4a1.5 1.5 0 0 1 2.12 0l4.4 4.4a1.5 1.5 0 0 1-2.12 2.12L13 9.91z"/>
-      </svg>
+      <img class="titlebar-logo" src="icon.svg" alt="OctoPublisher Logo">
       <div class="titlebar-title">
         <span>OctoPublisher</span>
         <span class="badge-pill pkg-version">v1.0.0</span>
@@ -644,19 +642,24 @@
       <!-- Section: Overview -->
       <section id="sec-overview" class="view-section">
         <div class="hero-card">
-          <div class="hero-title">
-            <span>OctoPublisher CLI</span>
-            <span class="badge-pill">.NET 10</span>
-          </div>
-          <div class="hero-subtitle">
-            Universal multi-store deployment automation engine for OctoCore applications. Publish Windows MSIX to Microsoft Partner Center and Android AAB/APK to Google Play in a single resilient CLI command.
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="flex: 1;">
+              <div class="hero-title">
+                <span>OctoPublisher CLI</span>
+                <span class="badge-pill">.NET 10</span>
+              </div>
+              <div class="hero-subtitle">
+                Universal multi-store deployment automation engine for OctoCore applications. Publish Windows MSIX to Microsoft Partner Center and Android AAB/APK to Google Play in a single resilient CLI command.
+              </div>
+            </div>
+            <img src="icon.svg" alt="OctoPublisher Mascot" style="width: 96px; height: 96px; flex-shrink: 0; filter: drop-shadow(0 8px 24px rgba(0, 255, 255, 0.22));" />
           </div>
           <div class="hero-badges">
             <span class="badge accent pkg-version-badge">NuGet: OctoPublisher v1.0.0</span>
             <span class="badge pkg-downloads" style="display: none;">0 downloads</span>
             <span class="badge">Target: net10.0</span>
             <span class="badge">MIT License</span>
-            <span class="badge">52/52 Tests Passing</span>
+            <span class="badge">69/69 Tests Passing</span>
             <span class="badge">Zero Runtime Dependencies</span>
           </div>
 

@@ -1,12 +1,14 @@
-# OctoPublisher
-
-Universal multi-store deployment automation engine for OctoCore applications.
+<div align="center">
+  <img src="https://raw.githubusercontent.com/OctoCore-Dev/OctoPublisher/main/icon.svg" width="128" height="128" alt="OctoPublisher Icon" />
+  <h1>OctoPublisher</h1>
+  <p>Universal multi-store deployment automation engine for OctoCore applications.</p>
+</div>
 
 ## Architecture
 
 - **`Octo.Common`**: Shared models, result contracts, ANSI terminal formatting (Fluent terminal aesthetics, no emojis).
 - **`Octo.MStore`**: Microsoft Store Dev Center Ingestion API client, Azure Blob chunked uploader, metadata and release notes manager.
-- **`Octo.PlayStore`**: Google Play Developer API publisher (AAB/APK deployments and track assignment).
+- **`Octo.PlayStore`**: Google Play Developer API publisher (AAB/APK deployments, tracks, localized release notes, and store listings).
 - **`OctoPublisher.Cli` (`octopublish`)**: Single executable CLI tool for CI/CD and local automated publishing.
 
 ## CLI Usage
@@ -42,6 +44,18 @@ octopublish mstore status --app-id "9NZXP5WR803J"
 octopublish mstore delete-draft --app-id "9NZXP5WR803J"
 ```
 
+### Google Play Store (`playstore`)
+
+#### Publish AAB / APK
+```bash
+octopublish playstore publish \
+  --package "./bin/Release/App.aab" \
+  --package-name "dev.octocore.obxodka" \
+  --service-account-key "$PLAY_STORE_JSON_KEY" \
+  --track "internal" \
+  --notes-dir "./packaging/whatsnew"
+```
+
 ## GitHub Actions Integration
 
 ```yaml
@@ -52,8 +66,8 @@ octopublish mstore delete-draft --app-id "9NZXP5WR803J"
     STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
     STORE_APP_ID: ${{ secrets.STORE_APP_ID }}
   run: |
-    dotnet run --project tools/OctoPublisher/src/OctoPublisher.Cli/OctoPublisher.Cli.csproj -- \
-      mstore publish \
+    dotnet tool install -g OctoPublisher
+    octopublish mstore publish \
       --package "${{ steps.find-pkg.outputs.pkg_path }}" \
       --notes-dir "./packaging/whatsnew" \
       --desc-dir "./packaging/store"

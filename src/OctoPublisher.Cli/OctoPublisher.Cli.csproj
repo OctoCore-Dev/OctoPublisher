@@ -8,17 +8,18 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>octopublish</ToolCommandName>
     <PackageId>OctoPublisher</PackageId>
-    <Version>1.0.0</Version>
     <Description>High-performance universal multi-store publishing CLI for modern CI/CD and local terminals.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://nuget.octopublisher.octocore.dev</PackageProjectUrl>
     <RepositoryUrl>https://github.com/OctoCore-Dev/OctoPublisher</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageTags>microsoft-store;msstore;windows;packaging;msix;ci-cd;google-play</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

@@ -9,14 +9,14 @@ public sealed class PlayStoreTests
     [Fact]
     public void ParseServiceAccountThrowsWhenFieldsMissing()
     {
-        var invalid = "{\"client_email\": \"\"}";
+        var invalid = /*lang=json,strict*/ "{\"client_email\": \"\"}";
         _ = Assert.Throws<InvalidOperationException>(() => GoogleAuthService.ParseServiceAccount(invalid));
     }
 
     [Fact]
     public void ParseServiceAccountParsesValidObject()
     {
-        var json = "{\"client_email\": \"bot@test.iam.gserviceaccount.com\", \"private_key\": \"key\", \"project_id\": \"my-project\"}";
+        var json = /*lang=json,strict*/ "{\"client_email\": \"bot@test.iam.gserviceaccount.com\", \"private_key\": \"key\", \"project_id\": \"my-project\"}";
         var account = GoogleAuthService.ParseServiceAccount(json);
 
         Assert.Equal("bot@test.iam.gserviceaccount.com", account.ClientEmail);
@@ -152,7 +152,7 @@ public sealed class PlayStoreTests
                 {
                     return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                     {
-                        Content = new StringContent("{\"access_token\":\"mock-token\",\"expires_in\":3600,\"token_type\":\"Bearer\"}", Encoding.UTF8, "application/json")
+                        Content = new StringContent(/*lang=json,strict*/ "{\"access_token\":\"mock-token\",\"expires_in\":3600,\"token_type\":\"Bearer\"}", Encoding.UTF8, "application/json")
                     });
                 }
 
@@ -160,7 +160,7 @@ public sealed class PlayStoreTests
                 {
                     return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                     {
-                        Content = new StringContent("{\"id\":\"edit-999\"}", Encoding.UTF8, "application/json")
+                        Content = new StringContent(/*lang=json,strict*/ "{\"id\":\"edit-999\"}", Encoding.UTF8, "application/json")
                     });
                 }
 
@@ -168,7 +168,7 @@ public sealed class PlayStoreTests
                 {
                     return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                     {
-                        Content = new StringContent("{\"versionCode\":77}", Encoding.UTF8, "application/json")
+                        Content = new StringContent(/*lang=json,strict*/ "{\"versionCode\":77}", Encoding.UTF8, "application/json")
                     });
                 }
 
