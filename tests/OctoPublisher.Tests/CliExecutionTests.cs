@@ -80,4 +80,104 @@ public sealed class CliExecutionTests
         var exitCode = await Program.Main(["playstore", "publish"]);
         Assert.Equal(2, exitCode);
     }
+
+    [Fact]
+    public async Task MainExecutesInitCommandSuccessfullyAsync()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var exitCode = await Program.Main(["init", tempDir]);
+            Assert.Equal(0, exitCode);
+
+            Assert.False(File.Exists(Path.Combine(tempDir, "README.md")));
+            Assert.True(File.Exists(Path.Combine(tempDir, "whatsnew", "whatsnew-ru-RU.txt")));
+            Assert.True(File.Exists(Path.Combine(tempDir, "store", "android", "ru-RU", "title.txt")));
+            Assert.True(File.Exists(Path.Combine(tempDir, "store", "android", "ru-RU", "short_description.txt")));
+            Assert.True(File.Exists(Path.Combine(tempDir, "store", "android", "ru-RU", "full_description.txt")));
+            Assert.True(File.Exists(Path.Combine(tempDir, "store", "windows", "ru-RU", "features.txt")));
+            Assert.True(File.Exists(Path.Combine(tempDir, "store", "android", "ru-RU", "icon.png")));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task MainExecutesAddCommandSuccessfullyAsync()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            _ = await Program.Main(["init", tempDir]);
+            var addCode = await Program.Main(["add", "android", "fr", "--dir", tempDir]);
+            Assert.Equal(0, addCode);
+
+            Assert.True(File.Exists(Path.Combine(tempDir, "store", "android", "fr-FR", "title.txt")));
+            Assert.True(File.Exists(Path.Combine(tempDir, "store", "android", "fr-FR", "icon.png")));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task MainExecutesListCommandSuccessfullyAsync()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            _ = await Program.Main(["init", tempDir]);
+            var listCode = await Program.Main(["list", "--dir", tempDir]);
+            Assert.Equal(0, listCode);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task MainExecutesTestCommandAndReturnsOneWhenPlaceholdersDetectedAsync()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            _ = await Program.Main(["init", tempDir]);
+            var testCode = await Program.Main(["test", "--dir", tempDir]);
+            Assert.Equal(1, testCode);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task MainExecutesPullHelpAsync()
+    {
+        var exitCode = await Program.Main(["pull", "--help"]);
+        Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
+    public async Task MainExecutesPullFailsWhenMissingArgumentsAsync()
+    {
+        var exitCode = await Program.Main(["pull", "windows"]);
+        Assert.Equal(1, exitCode);
+    }
 }

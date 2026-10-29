@@ -21,15 +21,15 @@ public static partial class AnsiTerminal
     public const string Yellow = "\u001b[38;2;252;225;0m";
     public const string Red = "\u001b[38;2;255;99;71m";
 
-    public static void Info(string message) => WriteLine($"{Muted}[INFO]{Reset} {White}{message}{Reset}");
+    public static void Info(string message) => WriteLine($"{Muted}[ИНФО]{Reset} {White}{message}{Reset}");
 
-    public static void Success(string message) => WriteLine($"{Green}[OK]{Reset} {White}{message}{Reset}");
+    public static void Success(string message) => WriteLine($"{Green}[УСПЕХ]{Reset} {White}{message}{Reset}");
 
-    public static void Warning(string message) => WriteLine($"{Yellow}[WARN]{Reset} {White}{message}{Reset}");
+    public static void Warning(string message) => WriteLine($"{Yellow}[ВНИМАНИЕ]{Reset} {White}{message}{Reset}");
 
-    public static void Error(string message) => WriteLine($"{Red}[ERR]{Reset} {White}{message}{Reset}");
+    public static void Error(string message) => WriteLine($"{Red}[ОШИБКА]{Reset} {White}{message}{Reset}");
 
-    public static void Step(string step, string message) => WriteLine($"{Accent}[*]{Reset} {Bold}{White}{step}{Reset} {Muted}-->{Reset} {message}");
+    public static void Step(string step, string message) => WriteLine($"{Accent}[ШАГ]{Reset} {Bold}{White}{step}{Reset} {Muted}-->{Reset} {message}");
 
     public static void Detail(string key, string value) => WriteLine($"    {Muted}|--{Reset} {Muted}{key}:{Reset} {Accent}{value}{Reset}");
 

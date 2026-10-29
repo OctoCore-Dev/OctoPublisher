@@ -90,4 +90,67 @@ public class MStoreListingManagerTests
 
         Assert.Equal("Global release notes", submission.Listings["de-DE"].ReleaseNotes);
     }
+
+    [Fact]
+    public void ResolveStoreDirectoryLoadsTitleDescriptionAndFeatures()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var ruDir = Path.Combine(tempDir, "ru-RU");
+        _ = Directory.CreateDirectory(ruDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(ruDir, "title.txt"), "Obxodka Windows");
+            File.WriteAllText(Path.Combine(ruDir, "description.txt"), "Полное описание Windows");
+            File.WriteAllText(Path.Combine(ruDir, "release_notes.txt"), "Заметки Windows");
+            File.WriteAllText(Path.Combine(ruDir, "features.txt"), "# Комментарий игнорируется\nБыстрый VPN\nFluent UI\nNo-Logs\n");
+
+            var result = MStoreListingManager.ResolveStoreDirectory(tempDir);
+
+            _ = Assert.Single(result);
+            var info = result["ru-ru"];
+            Assert.Equal("Obxodka Windows", info.Title);
+            Assert.Equal("Полное описание Windows", info.Description);
+            Assert.Equal("Заметки Windows", info.ReleaseNotes);
+            Assert.Equal(3, info.Features.Count);
+            Assert.Equal("Быстрый VPN", info.Features[0]);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void ApplyLocalizedMetadataAppliesStructuredListings()
+    {
+        var submission = new DevCenterSubmission
+        {
+            Listings = new Dictionary<string, DevCenterListing>
+            {
+                ["ru-RU"] = new DevCenterListing(),
+                ["en-US"] = new DevCenterListing()
+            }
+        };
+
+        var structured = new Dictionary<string, MStoreListingInfo>
+        {
+            ["ru-RU"] = new MStoreListingInfo
+            {
+                Title = "Obxodka Client",
+                Description = "Описание",
+                Features = ["Фича 1", "Фича 2"]
+            }
+        };
+
+        MStoreListingManager.ApplyLocalizedMetadata(submission, structuredListings: structured);
+
+        Assert.Equal("Obxodka Client", submission.Listings["ru-RU"].Title);
+        Assert.Equal("Описание", submission.Listings["ru-RU"].Description);
+        Assert.Equal(2, submission.Listings["ru-RU"].Features?.Count);
+        Assert.Null(submission.Listings["en-US"].Title);
+    }
 }

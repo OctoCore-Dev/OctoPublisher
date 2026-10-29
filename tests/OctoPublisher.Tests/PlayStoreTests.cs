@@ -105,6 +105,44 @@ public sealed class PlayStoreTests
     }
 
     [Fact]
+    public void ResolveFullListingsDiscoversTitleIconAndScreenshots()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var ruDir = Path.Combine(tempDir, "ru-RU");
+        var shotsDir = Path.Combine(ruDir, "phoneScreenshots");
+        _ = Directory.CreateDirectory(shotsDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(ruDir, "title.txt"), "Мое Приложение");
+            File.WriteAllText(Path.Combine(ruDir, "short_description.txt"), "Кратко");
+            File.WriteAllText(Path.Combine(ruDir, "full_description.txt"), "Подробно");
+            File.WriteAllBytes(Path.Combine(ruDir, "icon.png"), new byte[10]);
+            File.WriteAllBytes(Path.Combine(ruDir, "feature_graphic.png"), new byte[10]);
+            File.WriteAllBytes(Path.Combine(shotsDir, "01_home.png"), new byte[10]);
+            File.WriteAllBytes(Path.Combine(shotsDir, "02_profile.png"), new byte[10]);
+
+            var listings = PlayStoreListingManager.ResolveFullListings(null, tempDir);
+
+            _ = Assert.Single(listings);
+            var ru = listings["ru-RU"];
+            Assert.Equal("Мое Приложение", ru.Title);
+            Assert.Equal("Кратко", ru.ShortDescription);
+            Assert.Equal("Подробно", ru.FullDescription);
+            Assert.NotNull(ru.IconPath);
+            Assert.NotNull(ru.FeatureGraphicPath);
+            Assert.Equal(2, ru.PhoneScreenshots.Count);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task PublishAsyncReturnsValidationErrorsAsync()
     {
         var publisher = new PlayStorePublisher();

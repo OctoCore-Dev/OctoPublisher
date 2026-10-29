@@ -64,6 +64,23 @@ public sealed record MStoreCredentials(
             resolvedSeller);
     }
 
+    public static MStoreCredentials? TryLoad(
+        string? tenantId = null,
+        string? clientId = null,
+        string? clientSecret = null,
+        string? appId = null,
+        string? sellerId = null)
+    {
+        try
+        {
+            return Load(tenantId, clientId, clientSecret, appId, sellerId);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static void SaveConfig(MStoreCredentials credentials, bool localDirectory = false)
     {
         var targetPath = localDirectory

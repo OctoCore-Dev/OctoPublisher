@@ -1,79 +1,147 @@
-# OctoPublisher CLI Reference
+# Справочник команд OctoPublisher CLI
 
-Complete reference for all CLI commands, arguments, and environment variables.
-
----
-
-## Global Options
-
-| Option | Short | Description |
-| :--- | :--- | :--- |
-| `--help` | `-h` | Display help and usage instructions |
-| `--version` | `-v` | Display version and runtime info |
+Полный справочник команд, флагов и параметров командной строки `octopublish`.
 
 ---
 
-## Microsoft Store Module (`mstore`)
+## Глобальные параметры
 
-### 1. `octopublish mstore publish`
+| Флаг | Описание |
+| :--- | :--- |
+| `-h`, `--help` | Вывести подробную справочную информацию |
+| `-v`, `--version` | Вывести установленную версию программы |
 
-Uploads an application package to Microsoft Store, updates metadata, and commits the submission for certification.
+---
 
-#### Flags:
-- `--package <path>` **(Required)**: Absolute or relative path to `.msix`, `.msixupload`, `.msixbundle`, or `.zip` file.
-- `--app-id <id>`: Store Product ID (e.g. `9NZXP5WR803J`). Fallback: `STORE_APP_ID`.
-- `--tenant-id <id>`: Azure AD Directory (Tenant) ID. Fallback: `STORE_TENANT_ID`.
-- `--client-id <id>`: Azure AD Application (Client) ID. Fallback: `STORE_CLIENT_ID`.
-- `--client-secret <sec>`: Azure AD Client Secret. Fallback: `STORE_CLIENT_SECRET`.
-- `--seller-id <id>`: Partner Center Seller ID (e.g. `94042650`). Fallback: `SELLER_ID`.
-- `--notes <path>`: Path to a plain text file containing release notes to apply to all listings.
-- `--notes-dir <path>`: Directory containing localized release notes files (e.g. `whatsnew-ru-RU`, `whatsnew-en-US`).
-- `--desc <path>`: Path to a plain text file containing full store description.
-- `--desc-dir <path>`: Directory containing localized full descriptions.
+## 1. Команда `init` (Сборка структуры "Store as Code")
 
-#### Example:
+```bash
+octopublish init [all|android|windows] [--dir <каталог>] [--lang <локаль>]
+```
+
+- `all` *(по умолчанию)*: Создает структуру каталогов для Android и Windows.
+- `android`: Создает структуру только для Google Play Store.
+- `windows`: Создает структуру только для Microsoft Store.
+- `--dir <каталог>`: Целевая папка (по умолчанию: `packaging`).
+- `--lang <локаль>`: Основной язык приложения (по умолчанию: `ru-RU`).
+
+---
+
+## 2. Команда `pull` (Экспорт ассетов из сторов)
+
+Выгружает опубликованные описания, иконки, баннеры и скриншоты напрямую из Google Play и Microsoft Store.
+
+```bash
+octopublish pull [all|android|windows] [ID] [параметры]
+```
+
+- `windows <Product ID>`: Выгрузка из Microsoft Store (по Product ID без авторизации или через Partner Center API).
+- `android <Package Name>`: Выгрузка из Google Play Developer API (требует сервисный аккаунт).
+- `--dir <каталог>`: Папка сохранения (по умолчанию: `packaging`).
+- `--app-id <id>`: Product ID приложения Microsoft Store.
+- `--package-name <id>`: Идентификатор пакета Google Play.
+- `--service-account <путь>`: Ключ сервисного аккаунта Google Play (JSON).
+- `--lang <локаль>`: Конкретный язык для выгрузки (по умолчанию: все доступные).
+- `--market <рынок>`: Региональный рынок каталога Microsoft Store (по умолчанию: RU, US).
+
+---
+
+## 3. Команда `add` (Добавление языкового пакета)
+
+```bash
+octopublish add [all|android|windows] <локаль> [--dir <каталог>]
+```
+
+Поддерживает автоматическое сопоставление коротких кодов:
+- `ru` -> `ru-RU`
+- `en`, `us` -> `en-US`
+- `fr` -> `fr-FR`
+- `de` -> `de-DE`
+- `es` -> `es-ES`
+- `zh`, `cn` -> `zh-CN`
+- `ja`, `jp` -> `ja-JP`
+- `it` -> `it-IT`
+- `pt`, `br` -> `pt-BR`
+- `uk`, `ua` -> `uk-UA`
+- `kk`, `kz` -> `kk-KZ`
+- `tr` -> `tr-TR`
+- `ar`, `sa` -> `ar-SA`
+
+---
+
+## 4. Команда `test` (Предполётный линтер)
+
+```bash
+octopublish test [--dir <каталог>] [--strict]
+```
+
+- `--dir <каталог>`: Папка с метаданными (по умолчанию: `packaging`).
+- `--strict`: Строгий режим: завершает процесс с кодом `1` при наличии любых предупреждений.
+
+---
+
+## 5. Команда `list` (Сводная инспекция)
+
+```bash
+octopublish list [--dir <каталог>]
+```
+
+Выводит ANSI-таблицу статуса готовности обязательных текстовых файлов, разрешений иконок и скриншотов.
+
+---
+
+## 6. Команда `sync` (Синхронизация метаданных)
+
+```bash
+octopublish sync [all|android|windows] [--dir <каталог>] [--dry-run]
+```
+
+- `--dry-run`: Выполнить валидацию и сформировать diff без фактической отправки в магазины.
+
+---
+
+## 7. Модуль `playstore` (Google Play Store)
+
+### `playstore publish`
+```bash
+octopublish playstore publish \
+  --bundle <путь к .aab/.apk> \
+  --package-name <id приложения> \
+  --service-account <путь к JSON или содержимое> \
+  [--track <internal|alpha|beta|production>] \
+  [--notes-dir <папка whatsnew>] \
+  [--desc-dir <папка store/android>] \
+  [--icon <путь к иконке>] \
+  [--release-name <название версии>]
+```
+
+---
+
+## 8. Модуль `mstore` (Microsoft Store)
+
+### `mstore publish`
 ```bash
 octopublish mstore publish \
-  --package "./bin/Release/App_1.0.0.0_x64.msix" \
-  --notes-dir "./packaging/whatsnew" \
-  --desc-dir "./packaging/store"
+  --package <путь к .msix/.zip> \
+  [--app-id <Product ID>] \
+  [--tenant-id <Azure Tenant ID>] \
+  [--client-id <Azure Client ID>] \
+  [--client-secret <Azure Secret>] \
+  [--notes-dir <папка whatsnew>] \
+  [--desc-dir <папка store/windows>]
 ```
 
----
-
-### 2. `octopublish mstore status`
-
-Queries the current live application status in Partner Center, displaying:
-- Application primary name
-- App ID & Package Family Name
-- Last published submission ID
-- Active pending submission ID & its current status (`Release`, `Certification`, `PendingCommit`, etc.)
-
-#### Flags:
-- `--app-id <id>`: Target Store Product ID.
-
-#### Example:
+### `mstore status`
 ```bash
-octopublish mstore status --app-id "9NZXP5WR803J"
+octopublish mstore status [--app-id <Product ID>]
 ```
 
----
+### `mstore delete-draft`
+```bash
+octopublish mstore delete-draft [--app-id <Product ID>]
+```
 
-### 3. `octopublish mstore delete-draft`
-
-Safely deletes an active uncommitted draft submission if it was created in error or has an expired Azure SAS upload URL.
-
-> Note: If the submission is already in `Certification` or `Release`, Microsoft prevents deletion. OctoPublisher will report this clearly without crashing.
-
-#### Flags:
-- `--app-id <id>`: Target Store Product ID.
-
----
-
-### 4. `octopublish mstore configure`
-
-Interactively sets up credentials and saves them to a configuration file.
-
-#### Flags:
-- `--local`: Saves credentials to `./.octopublish.json` in the current working directory instead of user home (`~/.octo/mstore.json`).
-- You can also pass flags directly (`--tenant-id`, `--client-id`, etc.) to run non-interactively.
+### `mstore configure`
+```bash
+octopublish mstore configure [--local]
+```

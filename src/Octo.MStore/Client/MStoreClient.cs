@@ -24,6 +24,7 @@ public sealed class MStoreClient
         IReadOnlyDictionary<string, string>? descriptionsByLang = null,
         string? defaultNotes = null,
         string? defaultDescription = null,
+        IReadOnlyDictionary<string, MStoreListingInfo>? structuredListings = null,
         CancellationToken ct = default)
     {
         if (!File.Exists(packagePath))
@@ -136,7 +137,7 @@ public sealed class MStoreClient
 
         AnsiTerminal.Step("Metadata", "Applying package references and localized release notes...");
         MStoreListingManager.ApplyPackageUpdate(activeSubmission, pkgName);
-        MStoreListingManager.ApplyLocalizedMetadata(activeSubmission, releaseNotesByLang, descriptionsByLang, defaultNotes, defaultDescription);
+        MStoreListingManager.ApplyLocalizedMetadata(activeSubmission, releaseNotesByLang, descriptionsByLang, defaultNotes, defaultDescription, structuredListings);
 
         try
         {

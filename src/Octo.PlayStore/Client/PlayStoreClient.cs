@@ -146,6 +146,66 @@ public sealed class PlayStoreClient(HttpClient? httpClient = null)
         }
     }
 
+    public async Task<PlayListing?> GetListingAsync(
+        string packageName,
+        string editId,
+        string language,
+        string token,
+        CancellationToken ct = default)
+    {
+        var uri = $"{ApiBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/listings/{Uri.EscapeDataString(language)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        var respString = await response.Content.ReadAsStringAsync(ct);
+        return !response.IsSuccessStatusCode
+            ? throw new HttpRequestException($"Failed to get listing for '{language}': {response.StatusCode} - {respString}")
+            : JsonSerializer.Deserialize<PlayListing>(respString);
+    }
+
+    public async Task<List<PlayListing>> GetListingsAsync(
+        string packageName,
+        string editId,
+        string token,
+        CancellationToken ct = default)
+    {
+        var uri = $"{ApiBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/listings";
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var respString = await response.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException($"Failed to get listings: {response.StatusCode} - {respString}");
+        }
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        var parsed = JsonSerializer.Deserialize<PlayListingsResponse>(content);
+        return parsed?.Listings ?? [];
+    }
+
+    public async Task<bool> DeleteListingAsync(
+        string packageName,
+        string editId,
+        string language,
+        string token,
+        CancellationToken ct = default)
+    {
+        var uri = $"{ApiBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/listings/{Uri.EscapeDataString(language)}";
+        using var request = new HttpRequestMessage(HttpMethod.Delete, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        return response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
+    }
+
     public async Task UpdateListingAsync(
         string packageName,
         string editId,
@@ -156,9 +216,41 @@ public sealed class PlayStoreClient(HttpClient? httpClient = null)
         string token,
         CancellationToken ct = default)
     {
+        var resolvedTitle = title;
+        var resolvedFull = fullDescription;
+        var resolvedShort = shortDescription;
+
+        if (string.IsNullOrWhiteSpace(resolvedTitle) ||
+            string.IsNullOrWhiteSpace(resolvedFull) ||
+            string.IsNullOrWhiteSpace(resolvedShort))
+        {
+            try
+            {
+                var existing = await GetListingAsync(packageName, editId, language, token, ct);
+                if (existing != null)
+                {
+                    if (string.IsNullOrWhiteSpace(resolvedTitle) && !string.IsNullOrWhiteSpace(existing.Title))
+                    {
+                        resolvedTitle = existing.Title;
+                    }
+                    if (string.IsNullOrWhiteSpace(resolvedFull) && !string.IsNullOrWhiteSpace(existing.FullDescription))
+                    {
+                        resolvedFull = existing.FullDescription;
+                    }
+                    if (string.IsNullOrWhiteSpace(resolvedShort) && !string.IsNullOrWhiteSpace(existing.ShortDescription))
+                    {
+                        resolvedShort = existing.ShortDescription;
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
         var uri = $"{ApiBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/listings/{Uri.EscapeDataString(language)}";
 
-        var listing = new PlayListing(language, title, fullDescription, shortDescription);
+        var listing = new PlayListing(language, resolvedTitle, resolvedFull, resolvedShort);
         var json = JsonSerializer.Serialize(listing, _ignoreNullOptions);
 
         using var request = new HttpRequestMessage(HttpMethod.Put, uri)
@@ -176,6 +268,26 @@ public sealed class PlayStoreClient(HttpClient? httpClient = null)
         }
     }
 
+    public async Task DeleteAllImagesAsync(
+        string packageName,
+        string editId,
+        string language,
+        string imageType,
+        string token,
+        CancellationToken ct = default)
+    {
+        var uri = $"{ApiBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/listings/{Uri.EscapeDataString(language)}/{Uri.EscapeDataString(imageType)}";
+        using var request = new HttpRequestMessage(HttpMethod.Delete, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound)
+        {
+            var respString = await response.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException($"Failed to delete {imageType} images for '{language}': {response.StatusCode} - {respString}");
+        }
+    }
+
     public async Task UploadImageAsync(
         string packageName,
         string editId,
@@ -190,11 +302,14 @@ public sealed class PlayStoreClient(HttpClient? httpClient = null)
             throw new FileNotFoundException("Image file not found.", imagePath);
         }
 
+        var ext = Path.GetExtension(imagePath).ToLowerInvariant();
+        var mime = ext is ".jpg" or ".jpeg" ? "image/jpeg" : "image/png";
+
         var uri = $"{UploadBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/listings/{Uri.EscapeDataString(language)}/{Uri.EscapeDataString(imageType)}?uploadType=media";
 
         await using var stream = File.OpenRead(imagePath);
         using var content = new StreamContent(stream);
-        content.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        content.Headers.ContentType = new MediaTypeHeaderValue(mime);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, uri)
         {
@@ -241,5 +356,34 @@ public sealed class PlayStoreClient(HttpClient? httpClient = null)
             var respString = await response.Content.ReadAsStringAsync(ct);
             throw new HttpRequestException($"Failed to delete Google Play edit: {response.StatusCode} - {respString}");
         }
+    }
+
+    public async Task<List<PlayImage>> GetImagesAsync(
+        string packageName,
+        string editId,
+        string language,
+        string imageType,
+        string token,
+        CancellationToken ct = default)
+    {
+        var uri = $"{ApiBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/listings/{Uri.EscapeDataString(language)}/{Uri.EscapeDataString(imageType)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        var parsed = JsonSerializer.Deserialize<PlayImagesResponse>(content);
+        return parsed?.Images ?? [];
+    }
+
+    public async Task<byte[]?> DownloadImageBytesAsync(string url, CancellationToken ct = default)
+    {
+        using var response = await _httpClient.GetAsync(url, ct);
+        return !response.IsSuccessStatusCode ? null : await response.Content.ReadAsByteArrayAsync(ct);
     }
 }

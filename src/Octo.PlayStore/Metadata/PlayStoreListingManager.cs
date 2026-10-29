@@ -2,6 +2,8 @@ namespace Octo.PlayStore.Metadata;
 
 public static class PlayStoreListingManager
 {
+    private static readonly string[] t_imageExtensions = [".png", ".jpg", ".jpeg"];
+
     public static Dictionary<string, string> ResolveReleaseNotes(string? notesPath, string? notesDir)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -36,31 +38,85 @@ public static class PlayStoreListingManager
 
     public static Dictionary<string, (string? Full, string? Short)> ResolveListings(string? descPath, string? descDir)
     {
+        var full = ResolveFullListings(descPath, descDir);
         var result = new Dictionary<string, (string? Full, string? Short)>(StringComparer.OrdinalIgnoreCase);
-
-        if (!string.IsNullOrWhiteSpace(descDir) && Directory.Exists(descDir))
+        foreach (var (k, v) in full)
         {
-            foreach (var subDir in Directory.EnumerateDirectories(descDir))
+            if (!string.IsNullOrEmpty(v.FullDescription) || !string.IsNullOrEmpty(v.ShortDescription))
             {
-                var lang = NormalizeLanguage(Path.GetFileName(subDir));
-                string? full = null;
-                string? shortText = null;
+                result[k] = (v.FullDescription, v.ShortDescription);
+            }
+        }
+        return result;
+    }
 
-                var fullFile = Path.Combine(subDir, "full_description.txt");
-                if (File.Exists(fullFile))
+    public static Dictionary<string, PlayListingInfo> ResolveFullListings(string? descPath, string? descDir, string? fallbackIcon = null)
+    {
+        var result = new Dictionary<string, PlayListingInfo>(StringComparer.OrdinalIgnoreCase);
+
+        var hasValidDir = !string.IsNullOrWhiteSpace(descDir) && Directory.Exists(descDir);
+        var rootIcon = !string.IsNullOrWhiteSpace(fallbackIcon) && File.Exists(fallbackIcon) ? fallbackIcon : null;
+        var rootFeature = hasValidDir ? FindFirstFile(descDir!, ["feature_graphic.png", "feature_graphic.jpg", "feature.png", "feature.jpg"]) : null;
+        var rootPhone = hasValidDir ? CollectScreenshots(descDir!, ["phoneScreenshots", "phone", "screenshots"]) : [];
+        var rootSeven = hasValidDir ? CollectScreenshots(descDir!, ["sevenInchScreenshots", "tablet7"]) : [];
+        var rootTen = hasValidDir ? CollectScreenshots(descDir!, ["tenInchScreenshots", "tablet10"]) : [];
+
+        if (hasValidDir)
+        {
+            rootIcon ??= FindFirstFile(descDir!, ["icon.png", "icon.jpg", "icon.jpeg"]);
+
+            foreach (var subDir in Directory.EnumerateDirectories(descDir!))
+            {
+                var dirName = Path.GetFileName(subDir);
+                if (IsScreenshotDirectoryName(dirName))
                 {
-                    full = File.ReadAllText(fullFile).Trim();
+                    continue;
                 }
 
-                var shortFile = Path.Combine(subDir, "short_description.txt");
-                if (File.Exists(shortFile))
+                var lang = NormalizeLanguage(dirName);
+                var info = new PlayListingInfo { Language = lang };
+
+                var titleFile = FindFirstFile(subDir, ["title.txt", "name.txt"]);
+                if (titleFile != null)
                 {
-                    shortText = File.ReadAllText(shortFile).Trim();
+                    info.Title = File.ReadAllText(titleFile).Trim();
                 }
 
-                if (!string.IsNullOrEmpty(full) || !string.IsNullOrEmpty(shortText))
+                var shortFile = FindFirstFile(subDir, ["short_description.txt", "short.txt"]);
+                if (shortFile != null)
                 {
-                    result[lang] = (full, shortText);
+                    info.ShortDescription = File.ReadAllText(shortFile).Trim();
+                }
+
+                var fullFile = FindFirstFile(subDir, ["full_description.txt", "description.txt"]);
+                if (fullFile != null)
+                {
+                    info.FullDescription = File.ReadAllText(fullFile).Trim();
+                }
+
+                var localIcon = FindFirstFile(subDir, ["icon.png", "icon.jpg", "icon.jpeg"]);
+                info.IconPath = localIcon ?? rootIcon;
+
+                var localFeature = FindFirstFile(subDir, ["feature_graphic.png", "feature_graphic.jpg", "feature.png", "feature.jpg"]);
+                info.FeatureGraphicPath = localFeature ?? rootFeature;
+
+                var localPhone = CollectScreenshots(subDir, ["phoneScreenshots", "phone", "screenshots"]);
+                info.PhoneScreenshots = localPhone.Count > 0 ? localPhone : [.. rootPhone];
+
+                var localSeven = CollectScreenshots(subDir, ["sevenInchScreenshots", "tablet7"]);
+                info.SevenInchScreenshots = localSeven.Count > 0 ? localSeven : [.. rootSeven];
+
+                var localTen = CollectScreenshots(subDir, ["tenInchScreenshots", "tablet10"]);
+                info.TenInchScreenshots = localTen.Count > 0 ? localTen : [.. rootTen];
+
+                if (!string.IsNullOrEmpty(info.Title) ||
+                    !string.IsNullOrEmpty(info.ShortDescription) ||
+                    !string.IsNullOrEmpty(info.FullDescription) ||
+                    !string.IsNullOrEmpty(info.IconPath) ||
+                    !string.IsNullOrEmpty(info.FeatureGraphicPath) ||
+                    info.PhoneScreenshots.Count > 0)
+                {
+                    result[lang] = info;
                 }
             }
         }
@@ -70,12 +126,52 @@ public static class PlayStoreListingManager
             var content = File.ReadAllText(descPath).Trim();
             if (!string.IsNullOrWhiteSpace(content))
             {
-                result["en-US"] = (content, null);
+                result["en-US"] = new PlayListingInfo
+                {
+                    Language = "en-US",
+                    FullDescription = content,
+                    IconPath = rootIcon
+                };
             }
         }
 
         return result;
     }
+
+    private static string? FindFirstFile(string dir, string[] candidates)
+    {
+        foreach (var c in candidates)
+        {
+            var p = Path.Combine(dir, c);
+            if (File.Exists(p))
+            {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private static List<string> CollectScreenshots(string parentDir, string[] folderNames)
+    {
+        foreach (var name in folderNames)
+        {
+            var folder = Path.Combine(parentDir, name);
+            if (Directory.Exists(folder))
+            {
+                return [.. Directory.EnumerateFiles(folder)
+                    .Where(f => t_imageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)];
+            }
+        }
+        return [];
+    }
+
+    private static bool IsScreenshotDirectoryName(string name) =>
+        name.Equals("phoneScreenshots", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("sevenInchScreenshots", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("tenInchScreenshots", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("screenshots", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("graphics", StringComparison.OrdinalIgnoreCase);
 
     public static string NormalizeLanguage(string raw)
     {

@@ -1,68 +1,91 @@
-# Getting Started with OctoPublisher
+# Быстрый старт с OctoPublisher
 
-OctoPublisher can be used in three ways: as a global .NET CLI tool, as a standalone native single-file executable, or directly integrated into your CI/CD pipeline.
+Инструмент **OctoPublisher** (`octopublish`) можно использовать тремя способами: как глобальный инструмент .NET CLI, как автономный исполняемый файл или напрямую в пайплайнах CI/CD.
 
 ---
 
-## 1. Global .NET CLI Tool (Recommended)
+## 1. Установка как глобальный инструмент .NET CLI
 
-Requires [.NET 10 SDK](https://dotnet.microsoft.com/download):
+Требуется [.NET 10 SDK](https://dotnet.microsoft.com/download):
 
 ```bash
-# Install globally from NuGet or local package
+# Установка глобально из NuGet или локального пакета
 dotnet tool install -g OctoPublisher
 
-# Verify installation
+# Проверка версии и готовности
 octopublish --version
 ```
 
-To update:
+Для обновления до актуальной версии:
 ```bash
 dotnet tool update -g OctoPublisher
 ```
 
 ---
 
-## 2. Standalone Native Executables (Zero Prerequisites)
+## 2. Инициализация структуры проекта ("Store as Code")
 
-If you don't have .NET installed on your machine or CI runner, download pre-compiled standalone binaries from [GitHub Releases](https://github.com/OctoCore-Dev/OctoPublisher/releases):
+Чтобы начать управлять метаданными сторов в вашем репозитории:
 
-- **Windows (x64)**: `octopublish-win-x64.exe`
-- **Linux (x64)**: `octopublish-linux-x64`
-- **macOS (Apple Silicon arm64)**: `octopublish-osx-arm64`
-- **macOS (Intel x64)**: `octopublish-osx-x64`
-
-Make the binary executable on Unix:
 ```bash
-chmod +x octopublish-linux-x64
-./octopublish-linux-x64 --version
+# Вариант А: Создать чистую структуру с русскими шаблонами и PNG
+octopublish init all --dir packaging
+
+# Вариант Б: Выгрузить реальные ассеты из уже опубликованного приложения
+octopublish pull windows 9NZXP5WR803J --dir packaging
+octopublish pull android com.example.app --service-account ./play-key.json --dir packaging
+
+# Проверить список созданных или скачанных ассетов
+octopublish list --dir packaging
+
+# Добавить новый язык (например, английский или французский)
+octopublish add all en --dir packaging
+octopublish add android fr --dir packaging
 ```
 
 ---
 
-## 3. Quick Local Configuration
+## 3. Предполётная проверка перед релизом
 
-To avoid passing API secrets in command line arguments on every run, configure OctoPublisher once:
+Перед коммитом в Git или запуском публикации выполните проверку 5-уровневым линтером:
+
+```bash
+octopublish test --dir packaging
+```
+Линтер гарантирует, что вы не забыли шаблонные заглушки, не превысили лимиты длины названий и описаний и подготовили изображения правильного разрешения.
+
+---
+
+## 4. Локальная настройка авторизации Microsoft Store
+
+Чтобы не передавать ключи авторизации через флаги при каждом запуске, настройте профиль один раз:
 
 ```bash
 octopublish mstore configure
 ```
 
-This will interactively prompt for:
+Мастер интерактивно запросит:
 - Azure AD Tenant ID
 - Azure AD Client ID
 - Azure AD Client Secret
 - Microsoft Store App ID (Product ID)
-- Partner Center Seller ID (optional)
+- Partner Center Seller ID (необязательно)
 
-Credentials are saved securely in `~/.octo/mstore.json` (or `.octopublish.json` if using the `--local` flag).
+Данные сохраняются в защищенном пользовательском файле `~/.octo/mstore.json` (или в локальном `.octopublish.json` при флаге `--local`).
 
 ---
 
-## 4. First Publish Command
+## 5. Первый деплой в магазины
 
-Once configured, simply point OctoPublisher to your built package:
+После настройки публикация выполняется одной командой:
 
 ```bash
+# Публикация в Microsoft Store (Windows MSIX):
 octopublish mstore publish --package "./App_1.0.0.0_x64.msix"
+
+# Публикация в Google Play Store (Android AAB):
+octopublish playstore publish \
+  --bundle "./App.aab" \
+  --package-name "com.example.app" \
+  --service-account "service_account.json"
 ```
