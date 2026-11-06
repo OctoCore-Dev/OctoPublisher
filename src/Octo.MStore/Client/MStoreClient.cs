@@ -79,8 +79,8 @@ public sealed class MStoreClient
                     string.Equals(status, "PreProcessing", StringComparison.OrdinalIgnoreCase))
                 {
                     AnsiTerminal.Warning($"Submission {pendingInfo.Id} is already in '{status}' stage in Microsoft Store pipeline.");
-                    AnsiTerminal.Info("Skipping redundant re-submission to protect active release.");
-                    return PublisherResult.Success($"Active submission already in processing: {status}", pendingInfo.Id);
+                    AnsiTerminal.Info("Skipping submission to protect active release. Queued for autonomous deployment once certification finishes.");
+                    return PublisherResult.Queued($"Active submission already in processing: {status}", pendingInfo.Id);
                 }
 
                 if (string.Equals(status, "PendingCommit", StringComparison.OrdinalIgnoreCase))

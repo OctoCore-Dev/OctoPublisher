@@ -11,4 +11,9 @@ public readonly record struct PublisherResult(
 
     public static PublisherResult Failed(int exitCode, string message, string? opId = null) =>
         new(false, exitCode != 0 ? exitCode : 1, message, opId);
+
+    public static PublisherResult Queued(string message, string? opId = null) =>
+        new(false, 3, message, opId);
+
+    public bool IsQueued => ExitCode == 3;
 }

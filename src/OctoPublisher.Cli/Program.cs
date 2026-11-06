@@ -339,7 +339,7 @@ public static class Program
         return action switch
         {
             "publish" => await HandleMStorePublishAsync(client, credentials, flags),
-            "status" => await HandleMStoreStatusAsync(client, credentials),
+            "status" => await HandleMStoreStatusAsync(client, credentials, flags),
             "delete-draft" => await HandleMStoreDeleteDraftAsync(client, credentials),
             _ => UnknownSubcommand("mstore", action)
         };
@@ -467,13 +467,36 @@ public static class Program
 
     private static async Task<int> HandleMStoreStatusAsync(
         MStoreClient client,
-        MStoreCredentials credentials)
+        MStoreCredentials credentials,
+        Dictionary<string, string> flags)
     {
-        AnsiTerminal.Header("Проверка статуса в Microsoft Store");
         var tokenService = new MStoreTokenService();
         var token = await tokenService.GetAccessTokenAsync(credentials);
 
         var app = await client.GetApplicationAsync(credentials.AppId, token, CancellationToken.None);
+        string? pendingId = null;
+        string? pendingStatus = null;
+        var isBusy = false;
+
+        if (app.PendingApplicationSubmission != null && !string.IsNullOrWhiteSpace(app.PendingApplicationSubmission.Id))
+        {
+            pendingId = app.PendingApplicationSubmission.Id;
+            var sub = await client.GetSubmissionAsync(credentials.AppId, pendingId, token, CancellationToken.None);
+            pendingStatus = sub?.Status ?? "Unknown";
+            isBusy = string.Equals(pendingStatus, "Release", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(pendingStatus, "Certification", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(pendingStatus, "CommitStarted", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(pendingStatus, "PreProcessing", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (flags.ContainsKey("json"))
+        {
+            var json = $"{{\"appId\":\"{app.Id ?? credentials.AppId}\",\"name\":\"{app.PrimaryName}\",\"isBusy\":{(isBusy ? "true" : "false")},\"pendingSubmissionId\":\"{pendingId}\",\"pendingStatus\":\"{pendingStatus}\",\"lastPublishedSubmissionId\":\"{app.LastPublishedApplicationSubmission?.Id}\"}}";
+            Console.WriteLine(json);
+            return 0;
+        }
+
+        AnsiTerminal.Header("Проверка статуса в Microsoft Store");
         AnsiTerminal.Detail("Название приложения", app.PrimaryName ?? "Не указано");
         AnsiTerminal.Detail("Идентификатор (App ID)", app.Id ?? credentials.AppId);
 
@@ -482,19 +505,21 @@ public static class Program
             AnsiTerminal.Detail("Последняя опубликованная версия", app.LastPublishedApplicationSubmission.Id ?? "Нет");
         }
 
-        if (app.PendingApplicationSubmission != null && !string.IsNullOrWhiteSpace(app.PendingApplicationSubmission.Id))
+        if (pendingId != null)
         {
-            var subId = app.PendingApplicationSubmission.Id;
-            var sub = await client.GetSubmissionAsync(credentials.AppId, subId, token, CancellationToken.None);
-            AnsiTerminal.Detail("Текущая активная отправка", subId);
-            AnsiTerminal.Detail("Статус сертификации", sub?.Status ?? "Неизвестно");
+            AnsiTerminal.Detail("Текущая активная отправка", pendingId);
+            AnsiTerminal.Detail("Статус сертификации", pendingStatus ?? "Неизвестно");
+            if (isBusy)
+            {
+                AnsiTerminal.Warning("Приложение сейчас находится в процессе сертификации / публикации.");
+            }
         }
         else
         {
-            AnsiTerminal.Info("Нет активных незавершенных отправок (драфтов).");
+            AnsiTerminal.Info("Нет активных незавершенных отправок (драфтов). Стор свободен для новых версий.");
         }
 
-        return 0;
+        return isBusy ? 3 : 0;
     }
 
     private static async Task<int> HandleMStoreDeleteDraftAsync(
@@ -540,6 +565,7 @@ public static class Program
         return action switch
         {
             "publish" => await HandlePlayStorePublishAsync(flags),
+            "status" => await HandlePlayStoreStatusAsync(flags),
             _ => UnknownSubcommand("playstore", action)
         };
     }
@@ -771,6 +797,70 @@ public static class Program
         Console.WriteLine("  --client-secret <sec>   Azure AD Client Secret (STORE_CLIENT_SECRET)");
         Console.WriteLine("  --notes-dir <путь>      Каталог с локализованными заметками (packaging/whatsnew)");
         Console.WriteLine("  --desc-dir <путь>       Каталог с локализованными описаниями (packaging/store/windows)");
+    }
+
+    private static async Task<int> HandlePlayStoreStatusAsync(Dictionary<string, string> flags)
+    {
+        var packageName = flags.GetValueOrDefault("package-name")
+            ?? Environment.GetEnvironmentVariable("PLAY_PACKAGE_NAME");
+        if (string.IsNullOrWhiteSpace(packageName))
+        {
+            AnsiTerminal.Error("Отсутствует обязательный флаг: --package-name <id> (или переменная PLAY_PACKAGE_NAME)");
+            return 2;
+        }
+
+        var serviceAccount = flags.GetValueOrDefault("service-account")
+            ?? Environment.GetEnvironmentVariable("PLAY_CONFIG_JSON");
+        if (string.IsNullOrWhiteSpace(serviceAccount))
+        {
+            AnsiTerminal.Error("Отсутствует обязательный флаг: --service-account <json_or_file> (или переменная PLAY_CONFIG_JSON)");
+            return 2;
+        }
+
+        var track = flags.GetValueOrDefault("track") ?? "production";
+        var authService = new GoogleAuthService();
+        var client = new PlayStoreClient();
+        var account = GoogleAuthService.ParseServiceAccount(serviceAccount);
+        var token = await authService.GetAccessTokenAsync(account);
+
+        try
+        {
+            var editId = await client.CreateEditAsync(packageName, token);
+            if (flags.ContainsKey("json"))
+            {
+                Console.WriteLine($"{{\"packageName\":\"{packageName}\",\"track\":\"{track}\",\"isBusy\":false,\"status\":\"Ready\"}}");
+                return 0;
+            }
+
+            AnsiTerminal.Header("Статус Google Play Console");
+            AnsiTerminal.Detail("Пакет", packageName);
+            AnsiTerminal.Detail("Трек", track);
+            AnsiTerminal.Success("Консоль открыта для загрузки новых сборок (нет блокирующих проверок).");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            var isBusy = ex.Message.Contains("pending review", StringComparison.OrdinalIgnoreCase) ||
+                         ex.Message.Contains("in review", StringComparison.OrdinalIgnoreCase) ||
+                         ex.Message.Contains("cannot be sent for review", StringComparison.OrdinalIgnoreCase);
+
+            if (flags.ContainsKey("json"))
+            {
+                var safeErr = ex.Message.Replace("\"", "'");
+                Console.WriteLine($"{{\"packageName\":\"{packageName}\",\"track\":\"{track}\",\"isBusy\":{(isBusy ? "true" : "false")},\"error\":\"{safeErr}\"}}");
+                return isBusy ? 3 : 1;
+            }
+
+            if (isBusy)
+            {
+                AnsiTerminal.Warning($"Трек '{track}' находится на проверке: {ex.Message}");
+            }
+            else
+            {
+                AnsiTerminal.Error($"Ошибка проверки статуса: {ex.Message}");
+            }
+            return isBusy ? 3 : 1;
+        }
     }
 
     private static void PrintPlayStoreHelp()

@@ -163,8 +163,9 @@ public sealed class MStoreClientTests
 
             var result = await client.PublishAsync(t_testCreds, tempFile);
 
-            Assert.True(result.IsSuccess);
-            Assert.Equal(0, result.ExitCode);
+            Assert.False(result.IsSuccess);
+            Assert.True(result.IsQueued);
+            Assert.Equal(3, result.ExitCode);
             Assert.Contains("Release", result.Message);
             Assert.Equal("sub-active-42", result.OperationId);
         }

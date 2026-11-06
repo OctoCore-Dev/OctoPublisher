@@ -39,6 +39,7 @@ public sealed class PlayStorePublisher(GoogleAuthService? authService = null, Pl
             return PublisherResult.Failed(2, $"Unsupported package format '{ext}'. Expected .aab or .apk.");
         }
 
+        string? editId = null;
         try
         {
             AnsiTerminal.Info($"Authenticating with Google Play API for package '{packageName}'...");
@@ -47,7 +48,7 @@ public sealed class PlayStorePublisher(GoogleAuthService? authService = null, Pl
             AnsiTerminal.Success($"Authenticated as: {account.ClientEmail}");
 
             AnsiTerminal.Info("Creating Google Play edit transaction...");
-            var editId = await _client.CreateEditAsync(packageName, token, ct);
+            editId = await _client.CreateEditAsync(packageName, token, ct);
             AnsiTerminal.Success($"Edit transaction created: {editId}");
 
             int versionCode;
@@ -153,8 +154,22 @@ public sealed class PlayStorePublisher(GoogleAuthService? authService = null, Pl
         }
         catch (Exception ex)
         {
+            if (IsGooglePlayReviewBlocked(ex.Message))
+            {
+                AnsiTerminal.Warning($"Google Play track '{track}' has changes pending review: {ex.Message}");
+                AnsiTerminal.Info("Skipping submission to protect active review. Queued for autonomous deployment.");
+                return PublisherResult.Queued(ex.Message, editId);
+            }
+
             AnsiTerminal.Error($"Google Play publishing failed: {ex.Message}");
             return PublisherResult.Failed(1, ex.Message);
         }
     }
+
+    private static bool IsGooglePlayReviewBlocked(string message) =>
+        message.Contains("Changes cannot be sent for review", StringComparison.OrdinalIgnoreCase) ||
+        message.Contains("pending review", StringComparison.OrdinalIgnoreCase) ||
+        message.Contains("in review", StringComparison.OrdinalIgnoreCase) ||
+        message.Contains("inReview", StringComparison.OrdinalIgnoreCase) ||
+        message.Contains("cannot be sent for review", StringComparison.OrdinalIgnoreCase);
 }
