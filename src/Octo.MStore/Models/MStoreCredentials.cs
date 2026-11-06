@@ -7,7 +7,7 @@ public sealed record MStoreCredentials(
     string AppId,
     string? SellerId = null)
 {
-    private static readonly JsonSerializerOptions t_jsonOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions s_jsonOptions = new() { WriteIndented = true };
 
     public static MStoreCredentials Load(
         string? tenantId = null,
@@ -93,7 +93,7 @@ public sealed record MStoreCredentials(
             _ = Directory.CreateDirectory(dir);
         }
 
-        var json = JsonSerializer.Serialize(credentials, t_jsonOptions);
+        var json = JsonSerializer.Serialize(credentials, s_jsonOptions);
         File.WriteAllText(targetPath, json);
     }
 

@@ -2,7 +2,7 @@ namespace Octo.PlayStore.Metadata;
 
 public static class PlayStoreListingManager
 {
-    private static readonly string[] t_imageExtensions = [".png", ".jpg", ".jpeg"];
+    private static readonly string[] s_imageExtensions = [".png", ".jpg", ".jpeg"];
 
     public static Dictionary<string, string> ResolveReleaseNotes(string? notesPath, string? notesDir)
     {
@@ -159,7 +159,7 @@ public static class PlayStoreListingManager
             if (Directory.Exists(folder))
             {
                 return [.. Directory.EnumerateFiles(folder)
-                    .Where(f => t_imageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                    .Where(f => s_imageExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
                     .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)];
             }
         }

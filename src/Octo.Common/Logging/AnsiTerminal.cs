@@ -2,7 +2,7 @@ namespace Octo.Common.Logging;
 
 public static partial class AnsiTerminal
 {
-    private static readonly bool t_isAnsiSupported = !Console.IsOutputRedirected;
+    private static readonly bool s_isAnsiSupported = !Console.IsOutputRedirected;
 
     [GeneratedRegex(@"\u001b\[[0-9;]*m")]
     private static partial Regex AnsiEscapeRegex();
@@ -61,7 +61,7 @@ public static partial class AnsiTerminal
 
     private static void WriteLine(string text = "")
     {
-        if (t_isAnsiSupported)
+        if (s_isAnsiSupported)
         {
             Console.WriteLine(text);
         }

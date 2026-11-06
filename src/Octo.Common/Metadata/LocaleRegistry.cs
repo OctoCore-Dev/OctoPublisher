@@ -2,7 +2,7 @@ namespace Octo.Common.Metadata;
 
 public static class LocaleRegistry
 {
-    private static readonly Dictionary<string, string> t_aliases = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> s_aliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["ru"] = "ru-RU",
         ["ru-ru"] = "ru-RU",
@@ -77,7 +77,7 @@ public static class LocaleRegistry
         }
 
         var trimmed = input.Trim();
-        if (t_aliases.TryGetValue(trimmed, out var canonical))
+        if (s_aliases.TryGetValue(trimmed, out var canonical))
         {
             return canonical;
         }

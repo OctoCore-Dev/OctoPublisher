@@ -421,6 +421,11 @@ public static class Program
         {
             notesByLang = MStoreListingManager.LoadDirectoryFiles(notesDir);
         }
+        else if (Directory.Exists("packaging/whatsnew"))
+        {
+            notesByLang = MStoreListingManager.LoadDirectoryFiles("packaging/whatsnew");
+            AnsiTerminal.Info("Автообнаружен каталог заметок к выпуску: packaging/whatsnew");
+        }
 
         Dictionary<string, string>? descByLang = null;
         Dictionary<string, MStoreListingInfo>? structuredListings = null;
@@ -428,6 +433,12 @@ public static class Program
         {
             structuredListings = MStoreListingManager.ResolveStoreDirectory(descDir);
             descByLang = MStoreListingManager.LoadDirectoryFiles(descDir);
+        }
+        else if (Directory.Exists("packaging/store/windows"))
+        {
+            structuredListings = MStoreListingManager.ResolveStoreDirectory("packaging/store/windows");
+            descByLang = MStoreListingManager.LoadDirectoryFiles("packaging/store/windows");
+            AnsiTerminal.Info("Автообнаружен каталог витрины Microsoft Store: packaging/store/windows");
         }
 
         string? defaultNotes = null;
@@ -567,8 +578,19 @@ public static class Program
 
         var notes = flags.GetValueOrDefault("notes");
         var notesDir = flags.GetValueOrDefault("notes-dir");
+        if (string.IsNullOrWhiteSpace(notesDir) && Directory.Exists("packaging/whatsnew"))
+        {
+            notesDir = "packaging/whatsnew";
+            AnsiTerminal.Info("Автообнаружен каталог заметок к выпуску: packaging/whatsnew");
+        }
+
         var desc = flags.GetValueOrDefault("desc");
         var descDir = flags.GetValueOrDefault("desc-dir");
+        if (string.IsNullOrWhiteSpace(descDir) && Directory.Exists("packaging/store/android"))
+        {
+            descDir = "packaging/store/android";
+            AnsiTerminal.Info("Автообнаружен каталог витрины Google Play: packaging/store/android");
+        }
         var icon = flags.GetValueOrDefault("icon");
         var releaseName = flags.GetValueOrDefault("release-name");
 

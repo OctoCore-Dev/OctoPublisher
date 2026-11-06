@@ -2,7 +2,7 @@ namespace Octo.Common.Graphics;
 
 public static class ImageTemplateGenerator
 {
-    private static readonly uint[] t_crcTable = InitializeCrcTable();
+    private static readonly uint[] s_crcTable = InitializeCrcTable();
 
     private static uint[] InitializeCrcTable()
     {
@@ -24,7 +24,7 @@ public static class ImageTemplateGenerator
         var c = crc;
         foreach (var b in data)
         {
-            c = t_crcTable[(c ^ b) & 0xFF] ^ (c >> 8);
+            c = s_crcTable[(c ^ b) & 0xFF] ^ (c >> 8);
         }
         return c;
     }
