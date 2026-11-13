@@ -1,7 +1,13 @@
-<div align="center">
-  <h1>OctoPublisher</h1>
-  <p>Универсальный высокопроизводительный движок автоматизации публикации приложений в Google Play Store и Microsoft Store с парадигмой <b>Store as Code</b>.</p>
-</div>
+# OctoPublisher
+
+[![NuGet Version](https://img.shields.io/nuget/v/OctoPublisher.svg?style=flat-square&color=0078d4&logo=nuget)](https://www.nuget.org/packages/OctoPublisher/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/OctoPublisher.svg?style=flat-square&color=60cdff)](https://www.nuget.org/packages/OctoPublisher/)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512bd4?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Tests: 125 Passed](https://img.shields.io/badge/tests-125%20passed-brightgreen?style=flat-square)](https://github.com/OctoCore-Dev/OctoPublisher/actions)
+[![Documentation](https://img.shields.io/badge/docs-nuget.octopublisher.octocore.dev-0078d4?style=flat-square)](https://nuget.octopublisher.octocore.dev)
+
+> **Универсальный высокопроизводительный движок автоматизации публикации приложений в Google Play Store, Microsoft Store и Xbox с парадигмой Store as Code.**
 
 ---
 
@@ -11,7 +17,7 @@
 
 - **`Octo.Common`**: Базовые контракты результатов (`PublisherResult`), кроссплатформенный генератор растровых PNG без внешних зависимостей (`ImageTemplateGenerator`), реестр локалей и лимитов сторов (`LocaleRegistry`), терминальный вывод ANSI (`AnsiTerminal`).
 - **`Octo.PlayStore`**: Клиент Google Play Developer API v3 (публикация AAB / APK, назначение треков релизов, управление локализованными описаниями, загрузка иконок и скриншотов с защитой Safe-Merge).
-- **`Octo.MStore`**: Клиент Microsoft Partner Center Ingestion API (генерация Azure Blob SAS токенов, блочная загрузка MSIX / AppX пакетов, управление описаниями, фичами и скриншотами).
+- **`Octo.MStore`**: Клиент Microsoft Partner Center Ingestion API (генерация Azure Blob SAS токенов, блочная загрузка MSIX / AppX пакетов, поддержка Xbox ассетов, безаллокационный парсер трейлеров MP4 `VideoMetadataReader`, управление описаниями, фичами и скриншотами).
 - **`OctoPublisher.Cli` (`octopublish`)**: Консольная утилита с русскоязычным интерфейсом, 5-уровневым предполётным линтером, генерацией шаблонов и поддержкой CI/CD.
 
 ---
@@ -49,7 +55,7 @@ packaging/
     │       ├── feature_graphic.png
     │       └── phoneScreenshots/
     │
-    └── windows/                             # Метаданные Microsoft Store
+    └── windows/                             # Метаданные Microsoft Store и Xbox
         ├── ru-RU/                           # Русская локализация
         │   ├── title.txt                    # Название продукта в магазине (до 256 знаков)
         │   ├── full_description.txt         # Описание продукта (до 10 000 знаков)
@@ -58,6 +64,12 @@ packaging/
         │   ├── privacy.txt                  # Ссылка на политику конфиденциальности
         │   ├── icon.png                     # Логотип приложения (квадрат 300x300 PNG)
         │   ├── banner.png                   # Баннер приложения (1920x1080 SuperHeroArt)
+        │   ├── xbox/                        # Ассеты консолей Xbox (v1.4.2+)
+        │   │   ├── xbox-1080.png            # 1080x1080 PNG квадратный логотип
+        │   │   └── xbox-2160.png            # 2160x2160 PNG 4K логотип
+        │   ├── trailer/                     # Видео-трейлер (v1.4.2+)
+        │   │   ├── trailer.mp4              # 1920x1080 H.264/AAC MP4 видео
+        │   │   └── trailer-thumbnail.png    # 1920x1080 PNG постер (16:9)
         │   └── screenshots/                 # Скриншоты Windows (1920x1080 PNG)
         │
         └── en-US/                           # Английская локализация
@@ -68,6 +80,12 @@ packaging/
             ├── privacy.txt
             ├── icon.png
             ├── banner.png
+            ├── xbox/
+            │   ├── xbox-1080.png
+            │   └── xbox-2160.png
+            ├── trailer/
+            │   ├── trailer.mp4
+            │   └── trailer-thumbnail.png
             └── screenshots/
 ```
 
