@@ -243,6 +243,114 @@ public sealed class PlayStoreTests
         }
     }
 
+    [Fact]
+    public async Task PublishAsyncSmartPromotesWhenVersionCodeAlreadyUsedAsync()
+    {
+        using var rsa = RSA.Create(2048);
+        var pemKey = $"-----BEGIN PRIVATE KEY-----\n{Convert.ToBase64String(rsa.ExportPkcs8PrivateKey())}\n-----END PRIVATE KEY-----";
+        var saJson = $$"""{"client_email":"bot@test.iam.gserviceaccount.com","private_key":"{{pemKey.Replace("\n", "\\n", StringComparison.Ordinal)}}"}""";
+
+        var tempAab = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.aab");
+        await File.WriteAllBytesAsync(tempAab, new byte[256]);
+
+        try
+        {
+            var trackUpdatedWithVersion = 0;
+            var editCommitted = false;
+
+            var mockHandler = new MockHttpMessageHandler(async (req, ct) =>
+            {
+                var uri = req.RequestUri?.ToString() ?? "";
+                if (uri.Contains("oauth2.googleapis.com/token", StringComparison.Ordinal))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(/*lang=json,strict*/ "{\"access_token\":\"mock-token\",\"expires_in\":3600,\"token_type\":\"Bearer\"}", Encoding.UTF8, "application/json")
+                    };
+                }
+
+                if (uri.EndsWith("/edits", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(/*lang=json,strict*/ "{\"id\":\"edit-promote-123\"}", Encoding.UTF8, "application/json")
+                    };
+                }
+
+                if (uri.Contains("/bundles", StringComparison.OrdinalIgnoreCase))
+                {
+                    //эмуляция ответа google play с ошибкой занятого кода версии 105
+                    var errJson = /*lang=json,strict*/ """
+                    {
+                        "error": {
+                            "code": 403,
+                            "message": "Version code 105 has already been used.",
+                            "status": "PERMISSION_DENIED"
+                        }
+                    }
+                    """;
+                    return new HttpResponseMessage(HttpStatusCode.Forbidden)
+                    {
+                        Content = new StringContent(errJson, Encoding.UTF8, "application/json")
+                    };
+                }
+
+                if (uri.Contains("/tracks/production", StringComparison.OrdinalIgnoreCase))
+                {
+                    var body = req.Content != null ? await req.Content.ReadAsStringAsync(ct) : "";
+                    if (body.Contains("\"105\"", StringComparison.Ordinal))
+                    {
+                        trackUpdatedWithVersion = 105;
+                    }
+
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                    };
+                }
+
+                if (uri.Contains(":commit", StringComparison.OrdinalIgnoreCase))
+                {
+                    editCommitted = true;
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                    };
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                };
+            });
+
+            using var httpClient = new HttpClient(mockHandler);
+            var authService = new GoogleAuthService(httpClient);
+            var playClient = new PlayStoreClient(httpClient);
+
+            var publisher = new PlayStorePublisher(authService, playClient);
+            var result = await publisher.PublishAsync(
+                bundleOrApkPath: tempAab,
+                packageName: "com.octocore.obxodka",
+                serviceAccountInput: saJson,
+                track: "production");
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Equal("edit-promote-123", result.OperationId);
+            Assert.Equal(105, trackUpdatedWithVersion);
+            Assert.True(editCommitted);
+            Assert.Contains("Promoted existing package com.octocore.obxodka (v105)", result.Message);
+        }
+        finally
+        {
+            if (File.Exists(tempAab))
+            {
+                File.Delete(tempAab);
+            }
+        }
+    }
+
     private static string PadBase64(string input)
     {
         var replaced = input.Replace('-', '+').Replace('_', '/');

@@ -1,6 +1,8 @@
+using System.Text.RegularExpressions;
+
 namespace Octo.PlayStore;
 
-public sealed class PlayStorePublisher(GoogleAuthService? authService = null, PlayStoreClient? client = null)
+public sealed partial class PlayStorePublisher(GoogleAuthService? authService = null, PlayStoreClient? client = null)
 {
     private readonly GoogleAuthService _authService = authService ?? new GoogleAuthService();
     private readonly PlayStoreClient _client = client ?? new PlayStoreClient();
@@ -52,17 +54,31 @@ public sealed class PlayStorePublisher(GoogleAuthService? authService = null, Pl
             AnsiTerminal.Success($"Edit transaction created: {editId}");
 
             int versionCode;
-            if (ext == ".aab")
+            var isPromoted = false;
+            try
             {
-                AnsiTerminal.Info($"Uploading Android App Bundle: {Path.GetFileName(bundleOrApkPath)}...");
-                versionCode = await _client.UploadBundleAsync(packageName, editId, bundleOrApkPath, token, ct);
+                if (ext == ".aab")
+                {
+                    AnsiTerminal.Info($"Uploading Android App Bundle: {Path.GetFileName(bundleOrApkPath)}...");
+                    versionCode = await _client.UploadBundleAsync(packageName, editId, bundleOrApkPath, token, ct);
+                }
+                else
+                {
+                    AnsiTerminal.Info($"Uploading Android APK: {Path.GetFileName(bundleOrApkPath)}...");
+                    versionCode = await _client.UploadApkAsync(packageName, editId, bundleOrApkPath, token, ct);
+                }
+                AnsiTerminal.Success($"Package uploaded successfully. Version Code: {versionCode}");
             }
-            else
+            catch (Exception ex) when (IsVersionCodeAlreadyUsedError(ex.Message))
             {
-                AnsiTerminal.Info($"Uploading Android APK: {Path.GetFileName(bundleOrApkPath)}...");
-                versionCode = await _client.UploadApkAsync(packageName, editId, bundleOrApkPath, token, ct);
+                if (!TryExtractVersionCode(ex.Message, out versionCode))
+                {
+                    throw;
+                }
+
+                isPromoted = true;
+                AnsiTerminal.Info($"[ИНФО] Пакет с кодом {versionCode} уже загружен в Google Play. Выполняется автоматическое продвижение (Promote) в трек '{track}'...");
             }
-            AnsiTerminal.Success($"Package uploaded successfully. Version Code: {versionCode}");
 
             var releaseNotes = PlayStoreListingManager.ResolveReleaseNotes(notesPath, notesDir);
             AnsiTerminal.Info($"Assigning version {versionCode} to track '{track}' ({releaseNotes.Count} localized notes)...");
@@ -148,8 +164,9 @@ public sealed class PlayStorePublisher(GoogleAuthService? authService = null, Pl
             await _client.CommitEditAsync(packageName, editId, token, ct);
             AnsiTerminal.Success($"Release committed to Google Play track '{track}' successfully!");
 
-            return PublisherResult.Success(
-                $"Published package {packageName} (v{versionCode}) to Google Play track '{track}'.",
+            var actionVerb = isPromoted ? "Promoted existing package" : "Published package";
+            return PublisherResult.Ok(
+                $"{actionVerb} {packageName} (v{versionCode}) to Google Play track '{track}'.",
                 editId);
         }
         catch (Exception ex)
@@ -165,6 +182,45 @@ public sealed class PlayStorePublisher(GoogleAuthService? authService = null, Pl
             return PublisherResult.Failed(1, ex.Message);
         }
     }
+
+    //проверка ошибки занятого кода версии
+    private static bool IsVersionCodeAlreadyUsedError(string message) =>
+        message.Contains("already been used", StringComparison.OrdinalIgnoreCase) ||
+        message.Contains("versionCodeAlreadyUsed", StringComparison.OrdinalIgnoreCase);
+
+    //извлечение кода версии из сообщения об ошибке
+    private static bool TryExtractVersionCode(string message, out int versionCode)
+    {
+        var match = VersionCodeAlreadyUsedRegex().Match(message);
+        if (match.Success && int.TryParse(match.Groups[1].ValueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out versionCode))
+        {
+            return true;
+        }
+
+        match = VersionCodeAlternativeRegex().Match(message);
+        if (match.Success && int.TryParse(match.Groups[1].ValueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out versionCode))
+        {
+            return true;
+        }
+
+        match = VersionCodeFallbackRegex().Match(message);
+        if (match.Success && int.TryParse(match.Groups[1].ValueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out versionCode))
+        {
+            return true;
+        }
+
+        versionCode = 0;
+        return false;
+    }
+
+    [GeneratedRegex(@"Version\s+code\s+(\d+)\s+has\s+already\s+been\s+used", RegexOptions.IgnoreCase)]
+    private static partial Regex VersionCodeAlreadyUsedRegex();
+
+    [GeneratedRegex(@"(?:version\s*code|versionCode)\s*['""]?(\d+)['""]?.*already\s+been\s+used", RegexOptions.IgnoreCase)]
+    private static partial Regex VersionCodeAlternativeRegex();
+
+    [GeneratedRegex(@"(\d+)\s+has\s+already\s+been\s+used", RegexOptions.IgnoreCase)]
+    private static partial Regex VersionCodeFallbackRegex();
 
     private static bool IsGooglePlayReviewBlocked(string message) =>
         message.Contains("Changes cannot be sent for review", StringComparison.OrdinalIgnoreCase) ||

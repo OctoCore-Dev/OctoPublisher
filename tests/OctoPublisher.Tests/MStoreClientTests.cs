@@ -330,4 +330,165 @@ public sealed class MStoreClientTests
             }
         }
     }
+
+    [Fact]
+    public async Task GetSubmissionStatusAsyncReturnsStatusDetailsOnSuccessAsync()
+    {
+        var json = /*lang=json,strict*/ """
+        {
+            "status": "CommitFailed",
+            "statusDetails": {
+                "errors": [
+                    {
+                        "code": "PackageValidationError",
+                        "details": "Binary payload validation failed."
+                    }
+                ],
+                "warnings": [
+                    {
+                        "code": "ImageResolutionWarning",
+                        "details": "Screenshot resolution is sub-optimal."
+                    }
+                ]
+            }
+        }
+        """;
+
+        var handler = new MockHttpMessageHandler(req =>
+        {
+            Assert.Equal("https://manage.devcenter.microsoft.com/v1.0/my/applications/app-test-id/submissions/sub-fail-test/status", req.RequestUri!.ToString());
+            Assert.Equal("Bearer", req.Headers.Authorization?.Scheme);
+            Assert.Equal("test-token", req.Headers.Authorization?.Parameter);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var http = new HttpClient(handler);
+        var client = new MStoreClient(http);
+
+        var status = await client.GetSubmissionStatusAsync("app-test-id", "sub-fail-test", "test-token", CancellationToken.None);
+
+        Assert.NotNull(status);
+        Assert.Equal("CommitFailed", status.Status);
+        Assert.NotNull(status.StatusDetails);
+        _ = Assert.Single(status.StatusDetails.Errors!);
+        Assert.Equal("PackageValidationError", status.StatusDetails.Errors![0].Code);
+        Assert.Equal("Binary payload validation failed.", status.StatusDetails.Errors![0].Details);
+        _ = Assert.Single(status.StatusDetails.Warnings!);
+        Assert.Equal("ImageResolutionWarning", status.StatusDetails.Warnings![0].Code);
+    }
+
+    [Fact]
+    public async Task PublishAsyncFailsWithDetailedDiagnosticsOnCommitFailedAsync()
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"publish_fail_{Guid.NewGuid():N}.msix");
+        await File.WriteAllTextAsync(tempFile, "fake msix payload");
+
+        try
+        {
+            var handler = new MockHttpMessageHandler(req =>
+            {
+                var uri = req.RequestUri!.ToString();
+                var method = req.Method;
+
+                return (method, uri) switch
+                {
+                    _ when uri.Contains("login.microsoftonline.com", StringComparison.OrdinalIgnoreCase) =>
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(/*lang=json,strict*/ """{"access_token":"token_123","expires_in":"3600"}""", Encoding.UTF8, "application/json")
+                        },
+                    _ when uri.EndsWith("/v1.0/my/applications/app-test-id", StringComparison.OrdinalIgnoreCase) =>
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(/*lang=json,strict*/ """
+                            {
+                                "id": "app-test-id",
+                                "primaryName": "TestApp"
+                            }
+                            """, Encoding.UTF8, "application/json")
+                        },
+                    _ when method == HttpMethod.Post && uri.EndsWith("/submissions", StringComparison.OrdinalIgnoreCase) =>
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(/*lang=json,strict*/ """
+                            {
+                                "id": "sub-fail-99",
+                                "status": "PendingCommit",
+                                "fileUploadUrl": "https://storage.blob.core.windows.net/sas-dest",
+                                "applicationPackages": [],
+                                "listings": {}
+                            }
+                            """, Encoding.UTF8, "application/json")
+                        },
+                    _ when method == HttpMethod.Put && uri.Contains("storage.blob.core.windows.net", StringComparison.OrdinalIgnoreCase) =>
+                        new HttpResponseMessage(HttpStatusCode.Created),
+                    _ when method == HttpMethod.Put && uri.Contains("/submissions/sub-fail-99", StringComparison.OrdinalIgnoreCase) =>
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(/*lang=json,strict*/ """
+                            {
+                                "id": "sub-fail-99",
+                                "status": "PendingCommit"
+                            }
+                            """, Encoding.UTF8, "application/json")
+                        },
+                    _ when method == HttpMethod.Post && uri.EndsWith("/submissions/sub-fail-99/commit", StringComparison.OrdinalIgnoreCase) =>
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(/*lang=json,strict*/ """
+                            {
+                                "status": "CommitStarted"
+                            }
+                            """, Encoding.UTF8, "application/json")
+                        },
+                    _ when method == HttpMethod.Get && uri.EndsWith("/submissions/sub-fail-99", StringComparison.OrdinalIgnoreCase) =>
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(/*lang=json,strict*/ """
+                            {
+                                "id": "sub-fail-99",
+                                "status": "CommitFailed",
+                                "statusDetails": {
+                                    "errors": [
+                                        {
+                                            "code": "InvalidPackageFamilyName",
+                                            "details": "Package family name does not match reserved identity."
+                                        },
+                                        {
+                                            "code": "InvalidPublisherName",
+                                            "details": "Publisher certificate subject name mismatch."
+                                        }
+                                    ]
+                                }
+                            }
+                            """, Encoding.UTF8, "application/json")
+                        },
+                    _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+                };
+            });
+
+            using var http = new HttpClient(handler);
+            var tokenService = new MStoreTokenService(http);
+            var blobUploader = new AzureBlobUploader(http);
+            var client = new MStoreClient(http, tokenService, blobUploader);
+
+            var result = await client.PublishAsync(t_testCreds, tempFile);
+
+            Assert.False(result.IsSuccess);
+            Assert.Equal(9, result.ExitCode);
+            Assert.Equal("sub-fail-99", result.OperationId);
+            Assert.Contains("[InvalidPackageFamilyName] Package family name does not match reserved identity.", result.Message);
+            Assert.Contains("[InvalidPublisherName] Publisher certificate subject name mismatch.", result.Message);
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+            {
+                File.Delete(tempFile);
+            }
+        }
+    }
 }

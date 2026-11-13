@@ -190,7 +190,51 @@ public sealed class MStoreClient
                 if (string.Equals(checkStatus, "CommitFailed", StringComparison.OrdinalIgnoreCase))
                 {
                     AnsiTerminal.Error("Microsoft Dev Center rejected the submission (CommitFailed).");
-                    return PublisherResult.Failed(9, "Submission commit failed in Dev Center pipeline.", activeSubmission.Id);
+
+                    var statusDetails = check?.StatusDetails;
+                    if (statusDetails?.Errors is null or { Count: 0 })
+                    {
+                        try
+                        {
+                            var statusObj = await GetSubmissionStatusAsync(credentials.AppId, activeSubmission.Id!, accessToken, ct).ConfigureAwait(false);
+                            if (statusObj?.StatusDetails != null)
+                            {
+                                statusDetails = statusObj.StatusDetails;
+                            }
+                        }
+                        catch
+                        {
+                            // fallback если отдельный эндпоинт статуса недоступен
+                        }
+                    }
+
+                    var errors = statusDetails?.Errors;
+                    if (errors is { Count: > 0 })
+                    {
+                        AnsiTerminal.Error($"[ОШИБКИ ВАЛИДАЦИИ] Microsoft Dev Center вернул список ошибок ({errors.Count}):");
+                        for (var errIdx = 0; errIdx < errors.Count; errIdx++)
+                        {
+                            var err = errors[errIdx];
+                            AnsiTerminal.Error($"  [{errIdx + 1}] Код: {err.Code} | Детали: {err.Details}");
+                        }
+                    }
+
+                    var warnings = statusDetails?.Warnings;
+                    if (warnings is { Count: > 0 })
+                    {
+                        AnsiTerminal.Warning($"[ПРЕДУПРЕЖДЕНИЯ] Microsoft Dev Center вернул список предупреждений ({warnings.Count}):");
+                        for (var warnIdx = 0; warnIdx < warnings.Count; warnIdx++)
+                        {
+                            var warn = warnings[warnIdx];
+                            AnsiTerminal.Warning($"  [{warnIdx + 1}] Код: {warn.Code} | Детали: {warn.Details}");
+                        }
+                    }
+
+                    var errorSummary = errors is { Count: > 0 }
+                        ? string.Join("; ", errors.Select(e => $"[{e.Code}] {e.Details}"))
+                        : "Submission commit failed in Dev Center pipeline.";
+
+                    return PublisherResult.Failed(9, errorSummary, activeSubmission.Id);
                 }
             }
             catch (Exception ex)
@@ -224,6 +268,19 @@ public sealed class MStoreClient
         }
         await EnsureSuccessAsync(resp, ct).ConfigureAwait(false);
         return await resp.Content.ReadFromJsonAsync<DevCenterSubmission>(cancellationToken: ct).ConfigureAwait(false);
+    }
+
+    public async Task<DevCenterSubmissionStatus?> GetSubmissionStatusAsync(string appId, string submissionId, string token, CancellationToken ct)
+    {
+        var url = $"{BaseUrl}/v1.0/my/applications/{appId}/submissions/{submissionId}/status";
+        using var req = CreateRequest(HttpMethod.Get, url, token);
+        using var resp = await _httpClient.SendAsync(req, ct).ConfigureAwait(false);
+        if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+        await EnsureSuccessAsync(resp, ct).ConfigureAwait(false);
+        return await resp.Content.ReadFromJsonAsync<DevCenterSubmissionStatus>(cancellationToken: ct).ConfigureAwait(false);
     }
 
     public async Task<DevCenterSubmission> CreateSubmissionAsync(string appId, string token, CancellationToken ct)

@@ -249,6 +249,15 @@ public sealed class DevCenterCommitResponse
     public string? Status { get; set; }
 }
 
+public sealed class DevCenterSubmissionStatus
+{
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    [JsonPropertyName("statusDetails")]
+    public DevCenterStatusDetails? StatusDetails { get; set; }
+}
+
 public sealed class DevCenterStatusDetails
 {
     [JsonPropertyName("errors")]

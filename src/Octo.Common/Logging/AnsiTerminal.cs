@@ -21,13 +21,41 @@ public static partial class AnsiTerminal
     public const string Yellow = "\u001b[38;2;252;225;0m";
     public const string Red = "\u001b[38;2;255;99;71m";
 
-    public static void Info(string message) => WriteLine($"{Muted}[ИНФО]{Reset} {White}{message}{Reset}");
+    public static void Info(string message)
+    {
+        if (message.StartsWith("[ИНФО]", StringComparison.OrdinalIgnoreCase))
+        {
+            message = message["[ИНФО]".Length..].TrimStart();
+        }
+        WriteLine($"{Muted}[ИНФО]{Reset} {White}{message}{Reset}");
+    }
 
-    public static void Success(string message) => WriteLine($"{Green}[УСПЕХ]{Reset} {White}{message}{Reset}");
+    public static void Success(string message)
+    {
+        if (message.StartsWith("[УСПЕХ]", StringComparison.OrdinalIgnoreCase))
+        {
+            message = message["[УСПЕХ]".Length..].TrimStart();
+        }
+        WriteLine($"{Green}[УСПЕХ]{Reset} {White}{message}{Reset}");
+    }
 
-    public static void Warning(string message) => WriteLine($"{Yellow}[ВНИМАНИЕ]{Reset} {White}{message}{Reset}");
+    public static void Warning(string message)
+    {
+        if (message.StartsWith("[ВНИМАНИЕ]", StringComparison.OrdinalIgnoreCase))
+        {
+            message = message["[ВНИМАНИЕ]".Length..].TrimStart();
+        }
+        WriteLine($"{Yellow}[ВНИМАНИЕ]{Reset} {White}{message}{Reset}");
+    }
 
-    public static void Error(string message) => WriteLine($"{Red}[ОШИБКА]{Reset} {White}{message}{Reset}");
+    public static void Error(string message)
+    {
+        if (message.StartsWith("[ОШИБКА]", StringComparison.OrdinalIgnoreCase))
+        {
+            message = message["[ОШИБКА]".Length..].TrimStart();
+        }
+        WriteLine($"{Red}[ОШИБКА]{Reset} {White}{message}{Reset}");
+    }
 
     public static void Step(string step, string message) => WriteLine($"{Accent}[ШАГ]{Reset} {Bold}{White}{step}{Reset} {Muted}-->{Reset} {message}");
 

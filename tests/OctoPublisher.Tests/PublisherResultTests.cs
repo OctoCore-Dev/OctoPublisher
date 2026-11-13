@@ -15,6 +15,18 @@ public sealed class PublisherResultTests
     }
 
     [Fact]
+    public void OkSetsPropertiesAndZeroExitCode()
+    {
+        var result = PublisherResult.Ok("Operation succeeded", "SUB-123");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(result.IsQueued);
+        Assert.Equal("Operation succeeded", result.Message);
+        Assert.Equal("SUB-123", result.OperationId);
+    }
+
+    [Fact]
     public void FailedSetsFailureAndSpecifiedExitCode()
     {
         var result = PublisherResult.Failed(2, "Auth error", "SUB-FAIL");

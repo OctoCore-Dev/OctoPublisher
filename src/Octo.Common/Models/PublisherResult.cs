@@ -9,6 +9,9 @@ public readonly record struct PublisherResult(
     public static PublisherResult Success(string? message = null, string? opId = null) =>
         new(true, 0, message, opId);
 
+    public static PublisherResult Ok(string? message = null, string? opId = null) =>
+        Success(message, opId);
+
     public static PublisherResult Failed(int exitCode, string message, string? opId = null) =>
         new(false, exitCode != 0 ? exitCode : 1, message, opId);
 
