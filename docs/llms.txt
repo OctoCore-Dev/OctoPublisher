@@ -1,0 +1,101 @@
+# OctoPublisher
+
+> High-performance universal multi-store publishing CLI and library for .NET 10 with the "Store as Code" paradigm.
+
+OctoPublisher automates app publishing, metadata management, localized listings, graphic asset validation, and package deployment (AAB, APK, MSIX, APPX) to the Google Play Store, Microsoft Store, and Xbox Store directly from local terminals or CI/CD pipelines (GitHub Actions, Azure DevOps).
+
+## Official Links
+- Documentation & Portal: https://nuget.octopublisher.octocore.dev
+- NuGet Package: https://www.nuget.org/packages/OctoPublisher/
+- GitHub Repository: https://github.com/OctoCore-Dev/OctoPublisher
+- License: MIT
+
+## Core Capabilities
+- **Store as Code**: Keep all app store texts (titles, descriptions, release notes), icons, feature graphics, screenshots, Xbox assets, and MP4 trailers in a version-controlled `packaging/` directory in Git.
+- **Google Play Developer API v3**: Automatic upload of AAB/APK bundles, release track assignment (internal, alpha, beta, production), Safe-Merge metadata protection against 403 errors, and asset synchronization.
+- **Microsoft Partner Center Ingestion API**: Parallel multi-part Azure Blob SAS chunked uploads for MSIX/AppX packages, certification status inspection, draft management, and metadata updates.
+- **Xbox Store & 1080p/4K Assets (v1.4.2+)**: Support for `StoreLogo_1080x1080.png`, `StoreLogo_2160x2160.png`, and video trailers (`Trailer_1920x1080.mp4` and `TrailerThumbnail_1920x1080.png`).
+- **Zero-Allocation MP4 Video Trailer Parser**: Custom built-in ISO BMFF parser (`VideoMetadataReader`) that extracts MP4 dimensions, duration, and codecs directly from `ftyp`/`moov`/`mvhd`/`trak` boxes without requiring FFmpeg, ffprobe, or external binaries.
+- **5-Level Preflight Linter (`octopublish test`)**: Verifies character limits (e.g. Google Play 30 chars for title, 80 for short description; Microsoft Store 50/256 for title, 10000 for description), validates PNG/JPEG headers, ensures aspect ratios, and flags placeholder TODOs before commit.
+- **Native PNG Generation without Dependencies (`ImageTemplateGenerator`)**: Synthesizes 100% compliant IHDR/IDAT/IEND PNG bitmaps using pure C# and `ZLibStream` without `System.Drawing`, `SkiaSharp`, or native libraries.
+- **Asset Pull (`octopublish pull`)**: Reverse-imports live store listings and assets from Microsoft Store Display Catalog and Google Play.
+
+## Installation
+```bash
+# Install globally as .NET tool
+dotnet tool install --global OctoPublisher
+
+# Update to latest version
+dotnet tool update --global OctoPublisher
+
+# Add as project package
+dotnet add package OctoPublisher
+```
+
+## CLI Command Reference
+- `octopublish init all --dir packaging`: Initialize store directory structure with localized templates and valid PNG assets.
+- `octopublish test --dir packaging`: Run 5-level preflight validation on all localized files and images.
+- `octopublish list --dir packaging`: Display summary table of listing completion across all languages and stores.
+- `octopublish add all <lang> --dir packaging`: Add a new language localization (e.g. `en`, `es`, `fr`, `de`, `ja`, `zh`).
+- `octopublish pull windows <app-id>`: Pull live listings, icons, and hero art from Microsoft Store Display Catalog.
+- `octopublish mstore publish --package ./App.msix --app-id <app-id> --desc-dir packaging/store/windows`: Publish MSIX package and metadata to Microsoft Store.
+- `octopublish playstore publish --bundle ./App.aab --package-name <id> --service-account creds.json --track production`: Publish AAB package and metadata to Google Play Store.
+
+## Store as Code Directory Structure
+```
+packaging/
+├── whatsnew/
+│   ├── whatsnew-ru-RU.txt                   # Max 500 chars release notes
+│   └── whatsnew-en-US.txt
+└── store/
+    ├── android/                             # Google Play Store
+    │   └── ru-RU/
+    │       ├── title.txt                    # Max 30 chars
+    │       ├── short_description.txt        # Max 80 chars
+    │       ├── full_description.txt         # Max 4000 chars
+    │       ├── icon.png                     # 512x512 PNG 32-bit
+    │       ├── feature_graphic.png          # 1024x500 PNG/JPEG
+    │       └── phoneScreenshots/            # 2 to 8 images (16:9 or 9:16)
+    └── windows/                             # Microsoft Store & Xbox
+        └── ru-RU/
+            ├── title.txt                    # Max 50/256 chars
+            ├── description.txt              # Max 10000 chars
+            ├── features.txt                 # Max 20 lines, 200 chars each
+            ├── icon.png                     # 300x300 PNG
+            ├── xbox/                        # Xbox Store assets
+            │   ├── xbox-1080.png            # 1080x1080 PNG
+            │   └── xbox-2160.png            # 2160x2160 PNG
+            ├── trailer/                     # Video trailer
+            │   ├── trailer.mp4              # 1920x1080 MP4 H.264
+            │   └── trailer-thumbnail.png    # 1920x1080 PNG
+            └── screenshots/                 # 1366x768 or 1920x1080 PNG
+```
+
+## CI/CD Workflow (GitHub Actions)
+```yaml
+name: Release to App Stores
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install OctoPublisher
+        run: dotnet tool install -g OctoPublisher
+      - name: Preflight Lint
+        run: octopublish test --dir packaging
+      - name: Publish to Microsoft Store
+        env:
+          STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+          STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+          STORE_APP_ID: ${{ secrets.STORE_APP_ID }}
+        run: octopublish mstore publish --package ./App.msix --desc-dir packaging/store/windows
+```
