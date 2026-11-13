@@ -16,3 +16,5 @@ TestResults/
 .octopublish.json
 mstore.json
 service_account.json
+CODEBASE_MAP.md
+.gemini/
