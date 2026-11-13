@@ -41,8 +41,32 @@ public sealed class DisplayCatalogLocalizedProperty
     [JsonPropertyName("SupportUri")]
     public string? SupportUri { get; set; }
 
+    [JsonPropertyName("PublisherWebsiteUri")]
+    public string? PublisherWebsiteUri { get; set; }
+
     [JsonPropertyName("Images")]
     public List<DisplayCatalogImage>? Images { get; set; }
+
+    [JsonPropertyName("CMSVideos")]
+    public List<DisplayCatalogVideo>? CMSVideos { get; set; }
+}
+
+public sealed class DisplayCatalogVideo
+{
+    [JsonPropertyName("VideoPurpose")]
+    public string? VideoPurpose { get; set; }
+
+    [JsonPropertyName("Uri")]
+    public string? Uri { get; set; }
+
+    [JsonPropertyName("Height")]
+    public int Height { get; set; }
+
+    [JsonPropertyName("Width")]
+    public int Width { get; set; }
+
+    [JsonPropertyName("Caption")]
+    public string? Caption { get; set; }
 }
 
 public sealed class DisplayCatalogImage

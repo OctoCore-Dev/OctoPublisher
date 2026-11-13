@@ -73,6 +73,14 @@ public sealed record PlayImagesResponse(
     [property: JsonPropertyName("images")] List<PlayImage>? Images
 );
 
+public sealed record PlayAppDetails(
+    [property: JsonPropertyName("contactEmail")] string? ContactEmail = null,
+    [property: JsonPropertyName("contactPhone")] string? ContactPhone = null,
+    [property: JsonPropertyName("contactWebsite")] string? ContactWebsite = null,
+    [property: JsonPropertyName("defaultLanguage")] string? DefaultLanguage = null,
+    [property: JsonPropertyName("privacyPolicyUrl")] string? PrivacyPolicyUrl = null
+);
+
 public sealed class PlayListingInfo
 {
     public string Language { get; set; } = string.Empty;

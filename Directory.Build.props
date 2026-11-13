@@ -3,17 +3,24 @@
   <Import Project="$(MSBuildThisFileDirectory)Directory.Build.props.local" Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.props.local')" />
   <PropertyGroup>
     <IsWindows Condition="'$([MSBuild]::IsOSPlatform(&quot;Windows&quot;))' == 'true' or '$(OS)' == 'Windows_NT'">true</IsWindows>
-    <WorkspaceCodeRoot Condition="'$(IsWindows)' == 'true'">$([System.IO.Path]::GetFullPath('$(USERPROFILE)/code/').Replace('\', '/'))</WorkspaceCodeRoot>
+
+    <!-- Корневые пути под разные среды -->
+    <WorkspaceCodeRoot Condition="'$(IsWindows)' == 'true'">$(USERPROFILE)/code/</WorkspaceCodeRoot>
     <WorkspaceCodeRoot Condition="'$(IsWindows)' != 'true' and Exists('/mnt/c/Users/irovb/code/')">/mnt/c/Users/irovb/code/</WorkspaceCodeRoot>
     <WorkspaceCodeRoot Condition="'$(WorkspaceCodeRoot)' == '' and '$(HOME)' != ''">$(HOME)/code/</WorkspaceCodeRoot>
 
-    <NormalizedProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/').Replace('\', '/'))</NormalizedProjectDir>
-    <ProjectCacheSubDir Condition="'$(WorkspaceCodeRoot)' != '' and $([System.String]::Copy('$(NormalizedProjectDir)').StartsWith('$(WorkspaceCodeRoot)'))">$([System.String]::Copy('$(NormalizedProjectDir)').Substring('$([System.String]::Copy('$(WorkspaceCodeRoot)').Length)'))</ProjectCacheSubDir>
+    <ProjectCacheSubDir Condition="'$(WorkspaceCodeRoot)' != '' and $([System.String]::Copy('$(MSBuildProjectDirectory)/').StartsWith('$(WorkspaceCodeRoot)'))">$([System.String]::Copy('$(MSBuildProjectDirectory)').Substring('$([System.String]::Copy('$(WorkspaceCodeRoot)').Length)'))</ProjectCacheSubDir>
     <ProjectCacheSubDir Condition="'$(ProjectCacheSubDir)' == ''">$(MSBuildProjectName)</ProjectCacheSubDir>
+
+    <!-- Кеш под Windows -->
     <CustomCachePath Condition="'$(BUILD_CACHE_PATH)' != ''">$(BUILD_CACHE_PATH)/$(ProjectCacheSubDir)</CustomCachePath>
     <CustomCachePath Condition="'$(CustomCachePath)' == '' and '$(IsWindows)' == 'true'">C:/BuildCache/$(ProjectCacheSubDir)</CustomCachePath>
+
+    <!-- Кеш под Linux / WSL -->
     <CustomCachePath Condition="'$(IsWindows)' != 'true' and '$(HOME)' != ''">$(HOME)/.cache/build/$(ProjectCacheSubDir)</CustomCachePath>
     <CustomCachePath Condition="'$(CustomCachePath)' == ''">$(MSBuildProjectDirectory)/.artifacts</CustomCachePath>
+
+    <!-- Корневой путь для пакетов -->
     <PackageRoot Condition="'$(IsWindows)' == 'true'">$(USERPROFILE)/Documents/Package/</PackageRoot>
     <PackageRoot Condition="'$(IsWindows)' != 'true' and Exists('/mnt/c/Users/irovb/Documents/Package/')">/mnt/c/Users/irovb/Documents/Package/</PackageRoot>
     <PackageRoot Condition="'$(PackageRoot)' == '' and '$(HOME)' != ''">$(HOME)/Package/</PackageRoot>

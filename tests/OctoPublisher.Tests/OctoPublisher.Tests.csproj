@@ -5,6 +5,7 @@
     <AssemblyName>OctoPublisher.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);CA2000;IDE1006</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

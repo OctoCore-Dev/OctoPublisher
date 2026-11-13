@@ -29,6 +29,7 @@ public static class Program
                 "add" or "locale" or "lang" => HandleAddCommand(args.AsSpan(1).ToArray()),
                 "test" or "lint" or "check" or "validate" => HandleTestCommand(args.AsSpan(1).ToArray()),
                 "list" or "audit" => HandleListCommand(args.AsSpan(1).ToArray()),
+                "assets" or "guide" or "specs" => PackagingInspector.PrintAssetsGuide(args.AsSpan(1).ToArray()),
                 "sync" => await RunSyncCommandAsync(args.AsSpan(1).ToArray()),
                 _ => HandleUnknownCommand(primaryCommand)
             };
@@ -696,6 +697,7 @@ public static class Program
         Console.WriteLine("  add        Добавить языковой пакет для выбранной платформы (например: add android en)");
         Console.WriteLine("  test       Запустить 5-уровневый предполётный линтер (шаблоны, лимиты, размеры картинок)");
         Console.WriteLine("  list       Вывести сводную таблицу готовности метаданных и скриншотов");
+        Console.WriteLine("  assets     Справочник названий файлов, слотов Store и требуемых размеров картинок");
         Console.WriteLine("  sync       Быстрая синхронизация метаданных со сторами без пересборки бинарников");
         Console.WriteLine();
         Console.WriteLine("Команды публикации пакетов:");

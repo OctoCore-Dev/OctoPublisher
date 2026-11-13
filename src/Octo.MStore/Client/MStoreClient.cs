@@ -83,9 +83,11 @@ public sealed class MStoreClient
                     return PublisherResult.Queued($"Active submission already in processing: {status}", pendingInfo.Id);
                 }
 
-                if (string.Equals(status, "PendingCommit", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(status, "PendingCommit", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(status, "Draft", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(status, "InDraft", StringComparison.OrdinalIgnoreCase))
                 {
-                    AnsiTerminal.Info("Stale uncommitted draft detected. Deleting to obtain fresh Azure SAS URL...");
+                    AnsiTerminal.Info($"Stale uncommitted draft detected ({status}). Deleting to obtain fresh Azure SAS URL...");
                     _ = await DeleteSubmissionAsync(credentials.AppId, pendingInfo.Id, accessToken, ct).ConfigureAwait(false);
                     activeSubmission = null;
                 }
@@ -120,13 +122,20 @@ public sealed class MStoreClient
 
         var pkgName = Path.GetFileName(packagePath);
         var pkgLength = new FileInfo(packagePath).Length;
-        AnsiTerminal.Step("Upload", $"Uploading package '{pkgName}' ({pkgLength / 1048576.0:0.0} MB) to Azure Storage SAS...");
+
+        AnsiTerminal.Step("Metadata", "Applying package references, store graphic assets and localized release notes...");
+        MStoreListingManager.ApplyPackageUpdate(activeSubmission, pkgName);
+        var extraFiles = MStoreListingManager.ApplyLocalizedMetadata(activeSubmission, releaseNotesByLang, descriptionsByLang, defaultNotes, defaultDescription, structuredListings);
+
+        var extraCount = extraFiles.Count;
+        var extraMsg = extraCount > 0 ? $" and {extraCount} store asset(s)" : string.Empty;
+        AnsiTerminal.Step("Upload", $"Uploading package '{pkgName}' ({pkgLength / 1048576.0:0.0} MB){extraMsg} to Azure Storage SAS...");
 
         try
         {
-            await _blobUploader.UploadPackageAsync(activeSubmission.FileUploadUrl, packagePath, (cur, total, speed) => AnsiTerminal.ProgressBar(cur, total, speed), ct).ConfigureAwait(false);
+            await _blobUploader.UploadPackageAsync(activeSubmission.FileUploadUrl, packagePath, extraFiles, (cur, total, speed) => AnsiTerminal.ProgressBar(cur, total, speed), ct).ConfigureAwait(false);
             AnsiTerminal.EndProgressBar();
-            AnsiTerminal.Success("Package uploaded to Azure Storage successfully.");
+            AnsiTerminal.Success("Package and store assets uploaded to Azure Storage successfully.");
         }
         catch (Exception ex)
         {
@@ -134,10 +143,6 @@ public sealed class MStoreClient
             AnsiTerminal.Error($"Upload failed: {ex.Message}");
             return PublisherResult.Failed(6, ex.Message);
         }
-
-        AnsiTerminal.Step("Metadata", "Applying package references and localized release notes...");
-        MStoreListingManager.ApplyPackageUpdate(activeSubmission, pkgName);
-        MStoreListingManager.ApplyLocalizedMetadata(activeSubmission, releaseNotesByLang, descriptionsByLang, defaultNotes, defaultDescription, structuredListings);
 
         try
         {

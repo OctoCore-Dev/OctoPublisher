@@ -105,9 +105,33 @@ public static class PackagingPuller
 
                 foreach (var loc in product.LocalizedProperties)
                 {
-                    var localeCode = !string.IsNullOrWhiteSpace(loc.Language)
-                        ? LocaleRegistry.NormalizeLocale(loc.Language)
+                    var rawLang = loc.Language?.Trim() ?? string.Empty;
+                    if (string.Equals(rawLang, "neutral", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // В каталоге Microsoft Store "neutral" - внутренний fallback.
+                        // Если в ответе есть нормальные языки кроме neutral, пропускаем нейтральный дубль
+                        if (product.LocalizedProperties.Any(p => !string.IsNullOrWhiteSpace(p.Language) && !string.Equals(p.Language, "neutral", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            continue;
+                        }
+
+                        // Если опрашивался не русский рынок (например en-US), но вернулся русский neutral-fallback, не затираем
+                        if (!lng.StartsWith("ru", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        rawLang = lng;
+                    }
+
+                    var localeCode = !string.IsNullOrWhiteSpace(rawLang)
+                        ? LocaleRegistry.NormalizeLocale(rawLang)
                         : lng;
+
+                    if (string.Equals(localeCode, "neutral", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
 
                     var storeDir = Path.Combine(targetDir, "store", "windows", localeCode);
                     _ = Directory.CreateDirectory(storeDir);
@@ -145,10 +169,26 @@ public static class PackagingPuller
                         }
                     }
 
-                    var privacyUrl = loc.PrivacyUrl ?? loc.SupportUri;
-                    if (!string.IsNullOrWhiteSpace(privacyUrl))
+                    // Политика конфиденциальности: сохраняем только валидный веб-URL (http/https)
+                    if (!string.IsNullOrWhiteSpace(loc.PrivacyUrl) &&
+                        Uri.TryCreate(loc.PrivacyUrl, UriKind.Absolute, out var pUri) &&
+                        (pUri.Scheme == Uri.UriSchemeHttp || pUri.Scheme == Uri.UriSchemeHttps))
                     {
-                        await File.WriteAllTextAsync(Path.Combine(storeDir, "privacy.txt"), privacyUrl.Trim(), Encoding.UTF8, ct);
+                        await File.WriteAllTextAsync(Path.Combine(storeDir, "privacy.txt"), loc.PrivacyUrl.Trim(), Encoding.UTF8, ct);
+                    }
+
+                    // Контакт техподдержки: email, mailto или веб-форма
+                    if (!string.IsNullOrWhiteSpace(loc.SupportUri))
+                    {
+                        await File.WriteAllTextAsync(Path.Combine(storeDir, "support_contact.txt"), loc.SupportUri.Trim(), Encoding.UTF8, ct);
+                    }
+
+                    // Официальный веб-сайт разработчика
+                    if (!string.IsNullOrWhiteSpace(loc.PublisherWebsiteUri) &&
+                        Uri.TryCreate(loc.PublisherWebsiteUri, UriKind.Absolute, out var wUri) &&
+                        (wUri.Scheme == Uri.UriSchemeHttp || wUri.Scheme == Uri.UriSchemeHttps))
+                    {
+                        await File.WriteAllTextAsync(Path.Combine(storeDir, "website.txt"), loc.PublisherWebsiteUri.Trim(), Encoding.UTF8, ct);
                     }
 
                     if (loc.Images != null && loc.Images.Count > 0)
@@ -179,6 +219,68 @@ public static class PackagingPuller
                             }
                         }
 
+                        //квадратная обложка 1:1 (BoxArt 1080x1080 или 2160x2160)
+                        var boxArtImg = loc.Images
+                            .FirstOrDefault(i => (i.ImagePurpose is "BoxArt" or "FeaturePromotionalSquareArt" || (i.Width == 1080 && i.Height == 1080)) && !string.IsNullOrWhiteSpace(i.Uri));
+
+                        if (boxArtImg != null && !string.IsNullOrWhiteSpace(boxArtImg.Uri))
+                        {
+                            var bytes = await catalogClient.DownloadImageBytesAsync(boxArtImg.Uri, ct);
+                            if (bytes != null && bytes.Length > 0)
+                            {
+                                await File.WriteAllBytesAsync(Path.Combine(storeDir, "boxart.png"), bytes, ct);
+                            }
+                        }
+
+                        //постер 9:16 (Poster 720x1080 или 1440x2160)
+                        var posterImg = loc.Images
+                            .FirstOrDefault(i => (i.ImagePurpose is "Poster" || (i.Width == 720 && i.Height == 1080) || (i.Width == 1440 && i.Height == 2160)) && !string.IsNullOrWhiteSpace(i.Uri));
+
+                        if (posterImg != null && !string.IsNullOrWhiteSpace(posterImg.Uri))
+                        {
+                            var bytes = await catalogClient.DownloadImageBytesAsync(posterImg.Uri, ct);
+                            if (bytes != null && bytes.Length > 0)
+                            {
+                                await File.WriteAllBytesAsync(Path.Combine(storeDir, "poster.png"), bytes, ct);
+                            }
+                        }
+
+                        //фирменная заглавная иллюстрация xbox (BrandedKeyArt 584x800)
+                        var keyArtImg = loc.Images
+                            .FirstOrDefault(i => (i.ImagePurpose is "BrandedKeyArt" or "KeyArt" or "XboxBrandedKeyArt" || (i.Width == 584 && i.Height == 800)) && !string.IsNullOrWhiteSpace(i.Uri));
+
+                        if (keyArtImg != null && !string.IsNullOrWhiteSpace(keyArtImg.Uri))
+                        {
+                            var bytes = await catalogClient.DownloadImageBytesAsync(keyArtImg.Uri, ct);
+                            if (bytes != null && bytes.Length > 0)
+                            {
+                                await File.WriteAllBytesAsync(Path.Combine(storeDir, "branded_key_art.png"), bytes, ct);
+                            }
+                        }
+
+                        //дополнительные значки-плитки 150x150 и 71x71
+                        var icon150Img = loc.Images
+                            .FirstOrDefault(i => i.ImagePurpose is "Logo" && i.Width == 150 && i.Height == 150 && !string.IsNullOrWhiteSpace(i.Uri));
+                        if (icon150Img != null && !string.IsNullOrWhiteSpace(icon150Img.Uri))
+                        {
+                            var bytes = await catalogClient.DownloadImageBytesAsync(icon150Img.Uri, ct);
+                            if (bytes != null && bytes.Length > 0)
+                            {
+                                await File.WriteAllBytesAsync(Path.Combine(storeDir, "icon_150.png"), bytes, ct);
+                            }
+                        }
+
+                        var icon71Img = loc.Images
+                            .FirstOrDefault(i => i.ImagePurpose is "Logo" && i.Width == 71 && i.Height == 71 && !string.IsNullOrWhiteSpace(i.Uri));
+                        if (icon71Img != null && !string.IsNullOrWhiteSpace(icon71Img.Uri))
+                        {
+                            var bytes = await catalogClient.DownloadImageBytesAsync(icon71Img.Uri, ct);
+                            if (bytes != null && bytes.Length > 0)
+                            {
+                                await File.WriteAllBytesAsync(Path.Combine(storeDir, "icon_71.png"), bytes, ct);
+                            }
+                        }
+
                         var screenshots = loc.Images
                             .Where(i => i.ImagePurpose is "Screenshot" && !string.IsNullOrWhiteSpace(i.Uri))
                             .ToList();
@@ -186,17 +288,26 @@ public static class PackagingPuller
                         if (screenshots.Count > 0)
                         {
                             var screenDir = Path.Combine(storeDir, "screenshots");
-                            _ = Directory.CreateDirectory(screenDir);
+                            var urls = screenshots.Select(s => s.Uri!).ToList();
+                            await SyncScreenshotsAsync(screenDir, urls, catalogClient.DownloadImageBytesAsync, "{0:D2}_desktop.png", ct);
+                        }
+                    }
 
-                            for (var idx = 0; idx < screenshots.Count; idx++)
+                    if (loc.CMSVideos != null && loc.CMSVideos.Count > 0)
+                    {
+                        var primaryVideo = loc.CMSVideos.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v.Uri));
+                        if (primaryVideo != null && !string.IsNullOrWhiteSpace(primaryVideo.Uri))
+                        {
+                            var trailerDir = Path.Combine(storeDir, "trailers");
+                            _ = Directory.CreateDirectory(trailerDir);
+                            var bytes = await catalogClient.DownloadImageBytesAsync(primaryVideo.Uri, ct);
+                            if (bytes != null && bytes.Length > 0)
                             {
-                                var sc = screenshots[idx];
-                                var bytes = await catalogClient.DownloadImageBytesAsync(sc.Uri!, ct);
-                                if (bytes != null && bytes.Length > 0)
-                                {
-                                    var screenName = $"{idx + 1:D2}_screenshot.png";
-                                    await File.WriteAllBytesAsync(Path.Combine(screenDir, screenName), bytes, ct);
-                                }
+                                await File.WriteAllBytesAsync(Path.Combine(trailerDir, "trailer.mp4"), bytes, ct);
+                            }
+                            if (!string.IsNullOrWhiteSpace(primaryVideo.Caption))
+                            {
+                                await File.WriteAllTextAsync(Path.Combine(trailerDir, "trailer_title.txt"), primaryVideo.Caption.Trim(), Encoding.UTF8, ct);
                             }
                         }
                     }
@@ -331,6 +442,16 @@ public static class PackagingPuller
                 return 1;
             }
 
+            //чтение глобальных настроек приложения (privacy, support, website)
+            PlayAppDetails? appDetails = null;
+            try
+            {
+                appDetails = await client.GetAppDetailsAsync(resolvedPkg, editId, token, ct);
+            }
+            catch
+            {
+            }
+
             if (!string.IsNullOrWhiteSpace(requestedLang))
             {
                 var norm = LocaleRegistry.NormalizeLocale(requestedLang);
@@ -355,6 +476,26 @@ public static class PackagingPuller
                 if (!string.IsNullOrWhiteSpace(listing.FullDescription))
                 {
                     await File.WriteAllTextAsync(Path.Combine(storeDir, "full_description.txt"), listing.FullDescription.Trim(), Encoding.UTF8, ct);
+                }
+
+                if (appDetails != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(appDetails.PrivacyPolicyUrl) &&
+                        Uri.TryCreate(appDetails.PrivacyPolicyUrl, UriKind.Absolute, out var pUri) &&
+                        (pUri.Scheme == Uri.UriSchemeHttp || pUri.Scheme == Uri.UriSchemeHttps))
+                    {
+                        await File.WriteAllTextAsync(Path.Combine(storeDir, "privacy.txt"), appDetails.PrivacyPolicyUrl.Trim(), Encoding.UTF8, ct);
+                    }
+                    if (!string.IsNullOrWhiteSpace(appDetails.ContactEmail))
+                    {
+                        await File.WriteAllTextAsync(Path.Combine(storeDir, "support_contact.txt"), appDetails.ContactEmail.Trim(), Encoding.UTF8, ct);
+                    }
+                    if (!string.IsNullOrWhiteSpace(appDetails.ContactWebsite) &&
+                        Uri.TryCreate(appDetails.ContactWebsite, UriKind.Absolute, out var wUri) &&
+                        (wUri.Scheme == Uri.UriSchemeHttp || wUri.Scheme == Uri.UriSchemeHttps))
+                    {
+                        await File.WriteAllTextAsync(Path.Combine(storeDir, "website.txt"), appDetails.ContactWebsite.Trim(), Encoding.UTF8, ct);
+                    }
                 }
 
                 try
@@ -383,20 +524,8 @@ public static class PackagingPuller
                     if (phoneScreenshots.Count > 0)
                     {
                         var screenDir = Path.Combine(storeDir, "phoneScreenshots");
-                        _ = Directory.CreateDirectory(screenDir);
-
-                        for (var idx = 0; idx < phoneScreenshots.Count; idx++)
-                        {
-                            var sc = phoneScreenshots[idx];
-                            if (!string.IsNullOrWhiteSpace(sc.Url))
-                            {
-                                var bytes = await client.DownloadImageBytesAsync(sc.Url!, ct);
-                                if (bytes != null && bytes.Length > 0)
-                                {
-                                    await File.WriteAllBytesAsync(Path.Combine(screenDir, $"{idx + 1:D2}_screenshot.png"), bytes, ct);
-                                }
-                            }
-                        }
+                        var urls = phoneScreenshots.Where(s => !string.IsNullOrWhiteSpace(s.Url)).Select(s => s.Url!).ToList();
+                        await SyncScreenshotsAsync(screenDir, urls, client.DownloadImageBytesAsync, "{0:D2}_screenshot.png", ct);
                     }
                 }
                 catch (Exception ex)
@@ -418,6 +547,64 @@ public static class PackagingPuller
             }
             catch
             {
+            }
+        }
+    }
+
+    private static async Task SyncScreenshotsAsync(
+        string screenDir,
+        List<string> imageUrls,
+        Func<string, CancellationToken, Task<byte[]?>> downloader,
+        string defaultPattern,
+        CancellationToken ct)
+    {
+        if (imageUrls.Count == 0)
+        {
+            return;
+        }
+
+        _ = Directory.CreateDirectory(screenDir);
+
+        var existingFiles = Directory.Exists(screenDir)
+            ? Directory.EnumerateFiles(screenDir, "*.*")
+                .Where(f => f.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => f)
+                .ToList()
+            : [];
+
+        for (var idx = 0; idx < imageUrls.Count; idx++)
+        {
+            var url = imageUrls[idx];
+            var bytes = await downloader(url, ct);
+            if (bytes == null || bytes.Length == 0)
+            {
+                continue;
+            }
+
+            var prefix = $"{idx + 1:D2}_";
+            var existingForSlot = existingFiles.FirstOrDefault(f => Path.GetFileName(f).StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+            var targetFileName = existingForSlot != null
+                ? Path.GetFileName(existingForSlot)
+                : string.Format(CultureInfo.InvariantCulture, defaultPattern, idx + 1);
+
+            var targetPath = Path.Combine(screenDir, targetFileName);
+            await File.WriteAllBytesAsync(targetPath, bytes, ct);
+
+            //чистка возможных дубликатов с тем же порядковым номером
+            foreach (var duplicate in existingFiles.Where(f =>
+                Path.GetFileName(f).StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(f, targetPath, StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    File.Delete(duplicate);
+                }
+                catch
+                {
+                }
             }
         }
     }

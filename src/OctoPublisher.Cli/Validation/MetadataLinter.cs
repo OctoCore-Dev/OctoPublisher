@@ -279,6 +279,12 @@ public static class MetadataLinter
         var iconPath = Path.Combine(dir, "icon.png");
         if (File.Exists(iconPath))
         {
+            var info = new FileInfo(iconPath);
+            if (info.Length > 5 * 1024 * 1024)
+            {
+                result.Errors.Add($"[Windows/{locale}] Логотип 'icon.png' превышает лимит в 5 МБ (текущий размер: {info.Length / 1048576.0:0.0} МБ).");
+            }
+
             var dims = ImageTemplateGenerator.ReadPngDimensions(iconPath);
             if (dims == null)
             {
@@ -286,21 +292,235 @@ public static class MetadataLinter
             }
             else if (dims.Value.Width != 300 || dims.Value.Height != 300)
             {
-                result.Warnings.Add($"[Windows/{locale}] Логотип 'icon.png' имеет нестандартное разрешение {dims.Value.Width}x{dims.Value.Height} (рекомендуется строго 300x300).");
+                result.Errors.Add($"[Windows/{locale}] Значок-плитка 'icon.png' должна иметь строгое разрешение 300x300 (обнаружено: {dims.Value.Width}x{dims.Value.Height}).");
+            }
+        }
+
+        var boxArtPath = Path.Combine(dir, "boxart.png");
+        if (File.Exists(boxArtPath))
+        {
+            var info = new FileInfo(boxArtPath);
+            if (info.Length > 5 * 1024 * 1024)
+            {
+                result.Errors.Add($"[Windows/{locale}] Обложка 'boxart.png' превышает лимит в 5 МБ (текущий размер: {info.Length / 1048576.0:0.0} МБ).");
+            }
+
+            var dims = ImageTemplateGenerator.ReadDimensions(boxArtPath);
+            if (dims == null)
+            {
+                result.Errors.Add($"[Windows/{locale}] Обложка 'boxart.png' повреждена или не является валидным изображением.");
+            }
+            else if (!((dims.Value.Width == 1080 && dims.Value.Height == 1080) || (dims.Value.Width == 2160 && dims.Value.Height == 2160)))
+            {
+                result.Errors.Add($"[Windows/{locale}] Квадратная обложка 1:1 'boxart.png' должна иметь разрешение 1080x1080 или 2160x2160 (обнаружено: {dims.Value.Width}x{dims.Value.Height}).");
+            }
+        }
+
+        var posterPath = Path.Combine(dir, "poster.png");
+        if (File.Exists(posterPath))
+        {
+            var info = new FileInfo(posterPath);
+            if (info.Length > 5 * 1024 * 1024)
+            {
+                result.Errors.Add($"[Windows/{locale}] Постер 'poster.png' превышает лимит в 5 МБ (текущий размер: {info.Length / 1048576.0:0.0} МБ).");
+            }
+
+            var dims = ImageTemplateGenerator.ReadDimensions(posterPath);
+            if (dims == null)
+            {
+                result.Errors.Add($"[Windows/{locale}] Постер 'poster.png' поврежден или не является валидным изображением.");
+            }
+            else if (!((dims.Value.Width == 720 && dims.Value.Height == 1080) || (dims.Value.Width == 1440 && dims.Value.Height == 2160)))
+            {
+                result.Errors.Add($"[Windows/{locale}] Постер 9:16 'poster.png' должен иметь разрешение 720x1080 или 1440x2160 (обнаружено: {dims.Value.Width}x{dims.Value.Height}).");
             }
         }
 
         var bannerPath = Path.Combine(dir, "banner.png");
         if (File.Exists(bannerPath))
         {
-            var dims = ImageTemplateGenerator.ReadPngDimensions(bannerPath);
+            var info = new FileInfo(bannerPath);
+            if (info.Length > 5 * 1024 * 1024)
+            {
+                result.Errors.Add($"[Windows/{locale}] Баннер 'banner.png' превышает лимит в 5 МБ (текущий размер: {info.Length / 1048576.0:0.0} МБ).");
+            }
+
+            var dims = ImageTemplateGenerator.ReadDimensions(bannerPath);
             if (dims != null && (dims.Value.Width != 1920 || dims.Value.Height != 1080))
             {
-                result.Warnings.Add($"[Windows/{locale}] Баннер 'banner.png' имеет разрешение {dims.Value.Width}x{dims.Value.Height} (рекомендуется 1920x1080 SuperHeroArt).");
+                result.Warnings.Add($"[Windows/{locale}] Супербаннер 16:9 'banner.png' имеет разрешение {dims.Value.Width}x{dims.Value.Height} (рекомендуется 1920x1080 SuperHeroArt).");
             }
         }
 
+        var keyArtPath = Path.Combine(dir, "branded_key_art.png");
+        if (File.Exists(keyArtPath))
+        {
+            var info = new FileInfo(keyArtPath);
+            if (info.Length > 5 * 1024 * 1024)
+            {
+                result.Errors.Add($"[Windows/{locale}] Заглавная иллюстрация Xbox 'branded_key_art.png' превышает лимит в 5 МБ (текущий размер: {info.Length / 1048576.0:0.0} МБ).");
+            }
+
+            var dims = ImageTemplateGenerator.ReadDimensions(keyArtPath);
+            if (dims == null)
+            {
+                result.Errors.Add($"[Windows/{locale}] Заглавная иллюстрация Xbox 'branded_key_art.png' повреждена или не является валидным изображением.");
+            }
+            else if (dims.Value.Width != 584 || dims.Value.Height != 800)
+            {
+                result.Errors.Add($"[Windows/{locale}] Заглавная иллюстрация Xbox 'branded_key_art.png' должна иметь строгое разрешение 584x800 (обнаружено: {dims.Value.Width}x{dims.Value.Height}).");
+            }
+        }
+
+        var screenshotsDir = Path.Combine(dir, "screenshots");
+        if (Directory.Exists(screenshotsDir))
+        {
+            var screens = Directory.GetFiles(screenshotsDir, "*.png")
+                .Concat(Directory.GetFiles(screenshotsDir, "*.jpg"))
+                .Concat(Directory.GetFiles(screenshotsDir, "*.jpeg"))
+                .ToArray();
+
+            foreach (var screen in screens)
+            {
+                var sInfo = new FileInfo(screen);
+                if (sInfo.Length > 5 * 1024 * 1024)
+                {
+                    result.Errors.Add($"[Windows/{locale}] Скриншот '{Path.GetFileName(screen)}' превышает лимит в 5 МБ.");
+                }
+
+                var dims = ImageTemplateGenerator.ReadDimensions(screen);
+                if (dims != null && (dims.Value.Width != 1920 || dims.Value.Height != 1080))
+                {
+                    result.Warnings.Add($"[Windows/{locale}] Скриншот '{Path.GetFileName(screen)}' имеет разрешение {dims.Value.Width}x{dims.Value.Height} (рекомендуется строго 1920x1080 16:9).");
+                }
+            }
+        }
+
+        //валидация видеотрейлера
+        LintWindowsTrailer(dir, locale, result);
+
         LintPrivacy(dir, locale, "Windows", result);
+    }
+
+    private static void LintWindowsTrailer(string dir, string locale, LinterResult result)
+    {
+        var trailersDir = Path.Combine(dir, "trailers");
+        var searchDir = Directory.Exists(trailersDir) ? trailersDir : dir;
+
+        if (!Directory.Exists(searchDir))
+        {
+            return;
+        }
+
+        //проверка недопустимых видеоформатов в папке трейлеров
+        if (Directory.Exists(trailersDir))
+        {
+            var invalidVideos = Directory.GetFiles(trailersDir, "*.*")
+                .Where(f => f.EndsWith(".avi", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".webm", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".flv", StringComparison.OrdinalIgnoreCase) ||
+                            f.EndsWith(".wmv", StringComparison.OrdinalIgnoreCase));
+
+            foreach (var inv in invalidVideos)
+            {
+                result.Errors.Add($"[Windows/{locale}/Trailer] Формат файла '{Path.GetFileName(inv)}' не поддерживается Microsoft Store. Допустимы только MP4 или MOV.");
+            }
+        }
+
+        var videoFiles = Directory.GetFiles(searchDir, "*.mp4")
+            .Concat(Directory.GetFiles(searchDir, "*.mov"))
+            .ToArray();
+
+        if (videoFiles.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var videoFile in videoFiles)
+        {
+            var fileName = Path.GetFileName(videoFile);
+            var info = new FileInfo(videoFile);
+
+            //проверка размера: до 2 ГБ
+            const long maxVideoBytes = 2L * 1024 * 1024 * 1024;
+            if (info.Length > maxVideoBytes)
+            {
+                result.Errors.Add($"[Windows/{locale}/Trailer] Трейлер '{fileName}' превышает максимальный лимит в 2 ГБ (текущий: {info.Length / (1024.0 * 1024 * 1024):0.0} ГБ).");
+            }
+
+            //проверка разрешения: строго 1920x1080
+            var dims = VideoMetadataReader.ReadDimensions(videoFile);
+            if (dims == null)
+            {
+                result.Errors.Add($"[Windows/{locale}/Trailer] Не удалось прочитать видеопоток '{fileName}'. Убедитесь, что файл является валидным MP4 или MOV контейнером с видеодорожкой 1920x1080.");
+            }
+            else if (dims.Value.Width != 1920 || dims.Value.Height != 1080)
+            {
+                result.Errors.Add($"[Windows/{locale}/Trailer] Трейлер '{fileName}' должен иметь строгое разрешение 1920x1080 (обнаружено: {dims.Value.Width}x{dims.Value.Height}).");
+            }
+
+            //проверка обложки трейлера: строго 1920x1080 PNG
+            var thumbFile = Path.Combine(Path.GetDirectoryName(videoFile)!, "trailer_thumbnail.png");
+            if (!File.Exists(thumbFile))
+            {
+                thumbFile = Path.Combine(Path.GetDirectoryName(videoFile)!, "thumbnail.png");
+            }
+
+            if (!File.Exists(thumbFile))
+            {
+                result.Errors.Add($"[Windows/{locale}/Trailer] Для трейлера '{fileName}' отсутствует обязательная обложка 'trailer_thumbnail.png' (строго 1920x1080 PNG).");
+            }
+            else
+            {
+                var thumbDims = ImageTemplateGenerator.ReadPngDimensions(thumbFile);
+                if (thumbDims == null)
+                {
+                    result.Errors.Add($"[Windows/{locale}/Trailer] Обложка трейлера '{Path.GetFileName(thumbFile)}' повреждена или не является PNG.");
+                }
+                else if (thumbDims.Value.Width != 1920 || thumbDims.Value.Height != 1080)
+                {
+                    result.Errors.Add($"[Windows/{locale}/Trailer] Обложка трейлера '{Path.GetFileName(thumbFile)}' должна иметь строгое разрешение 1920x1080 (обнаружено: {thumbDims.Value.Width}x{thumbDims.Value.Height}).");
+                }
+            }
+
+            //проверка заголовка трейлера: до 255 символов
+            var titleFile = Path.Combine(Path.GetDirectoryName(videoFile)!, "trailer_title.txt");
+            if (!File.Exists(titleFile))
+            {
+                titleFile = Path.Combine(Path.GetDirectoryName(videoFile)!, "title.txt");
+            }
+
+            if (File.Exists(titleFile))
+            {
+                var titleText = File.ReadAllText(titleFile).Trim();
+                if (titleText.Length > 255)
+                {
+                    result.Errors.Add($"[Windows/{locale}/Trailer] Заголовок трейлера в '{Path.GetFileName(titleFile)}' превышает лимит в 255 знаков (текущая длина: {titleText.Length}).");
+                }
+            }
+
+            //проверка дополнительных файлов: субтитры (.vtt < 50 МБ), аудиоописание (.mp3 < 500 МБ)
+            var parentDir = Path.GetDirectoryName(videoFile)!;
+            foreach (var vtt in Directory.GetFiles(parentDir, "*.vtt"))
+            {
+                if (new FileInfo(vtt).Length > 50L * 1024 * 1024)
+                {
+                    result.Errors.Add($"[Windows/{locale}/Trailer] Файл субтитров '{Path.GetFileName(vtt)}' превышает лимит Microsoft Store в 50 МБ.");
+                }
+            }
+
+            foreach (var mp3 in Directory.GetFiles(parentDir, "*.mp3"))
+            {
+                if (new FileInfo(mp3).Length > 500L * 1024 * 1024)
+                {
+                    result.Errors.Add($"[Windows/{locale}/Trailer] Файл аудиоописания '{Path.GetFileName(mp3)}' превышает лимит Microsoft Store в 500 МБ.");
+                }
+            }
+
+            //предупреждение против встроенных возрастных рейтингов
+            result.Warnings.Add($"[Windows/{locale}/Trailer] Убедитесь, что внутри видео '{fileName}' нет встроенных графических значков возрастных рейтингов (12+, 16+, PEGI), иначе Microsoft Store отклонит публикацию.");
+        }
     }
 
     private static void LintPrivacy(string dir, string locale, string platform, LinterResult result)

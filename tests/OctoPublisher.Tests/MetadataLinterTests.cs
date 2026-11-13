@@ -90,4 +90,139 @@ public sealed class MetadataLinterTests
             }
         }
     }
+
+    [Fact]
+    public void LintFailsWhenWindowsIconHasWrongDimensions()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var winDir = Path.Combine(tempDir, "store", "windows", "ru-RU");
+            _ = Directory.CreateDirectory(winDir);
+
+            File.WriteAllText(Path.Combine(winDir, "title.txt"), "Obxodka");
+            File.WriteAllText(Path.Combine(winDir, "full_description.txt"), "Описание");
+            File.WriteAllBytes(Path.Combine(winDir, "icon.png"), ImageTemplateGenerator.GeneratePng(200, 200));
+
+            var result = MetadataLinter.Lint(tempDir);
+            Assert.False(result.IsSuccess);
+            Assert.Contains(result.Errors, e => e.Contains("icon.png") && e.Contains("300x300"));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void LintFailsWhenWindowsBoxArtHasWrongDimensions()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var winDir = Path.Combine(tempDir, "store", "windows", "ru-RU");
+            _ = Directory.CreateDirectory(winDir);
+
+            File.WriteAllText(Path.Combine(winDir, "title.txt"), "Obxodka");
+            File.WriteAllText(Path.Combine(winDir, "full_description.txt"), "Описание");
+            File.WriteAllBytes(Path.Combine(winDir, "boxart.png"), ImageTemplateGenerator.GeneratePng(500, 500));
+
+            var result = MetadataLinter.Lint(tempDir);
+            Assert.False(result.IsSuccess);
+            Assert.Contains(result.Errors, e => e.Contains("boxart.png") && e.Contains("1080x1080"));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void LintFailsWhenWindowsPosterHasWrongDimensions()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var winDir = Path.Combine(tempDir, "store", "windows", "ru-RU");
+            _ = Directory.CreateDirectory(winDir);
+
+            File.WriteAllText(Path.Combine(winDir, "title.txt"), "Obxodka");
+            File.WriteAllText(Path.Combine(winDir, "full_description.txt"), "Описание");
+            File.WriteAllBytes(Path.Combine(winDir, "poster.png"), ImageTemplateGenerator.GeneratePng(500, 500));
+
+            var result = MetadataLinter.Lint(tempDir);
+            Assert.False(result.IsSuccess);
+            Assert.Contains(result.Errors, e => e.Contains("poster.png") && e.Contains("720x1080"));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void LintPassesWhenWindowsAssetsAreValid()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var winDir = Path.Combine(tempDir, "store", "windows", "ru-RU");
+            _ = Directory.CreateDirectory(winDir);
+
+            File.WriteAllText(Path.Combine(winDir, "title.txt"), "Obxodka");
+            File.WriteAllText(Path.Combine(winDir, "full_description.txt"), "Описание приложения для Windows");
+            File.WriteAllBytes(Path.Combine(winDir, "icon.png"), ImageTemplateGenerator.GeneratePng(300, 300));
+            File.WriteAllBytes(Path.Combine(winDir, "boxart.png"), ImageTemplateGenerator.GeneratePng(1080, 1080));
+            File.WriteAllBytes(Path.Combine(winDir, "poster.png"), ImageTemplateGenerator.GeneratePng(720, 1080));
+            File.WriteAllBytes(Path.Combine(winDir, "banner.png"), ImageTemplateGenerator.GeneratePng(1920, 1080));
+
+            var result = MetadataLinter.Lint(tempDir);
+            Assert.True(result.IsSuccess);
+            Assert.Empty(result.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void LintFailsWhenWindowsTrailerHasNoThumbnail()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var winDir = Path.Combine(tempDir, "store", "windows", "ru-RU");
+            var trailerDir = Path.Combine(winDir, "trailers");
+            _ = Directory.CreateDirectory(trailerDir);
+
+            File.WriteAllText(Path.Combine(winDir, "title.txt"), "Obxodka");
+            File.WriteAllText(Path.Combine(winDir, "full_description.txt"), "Описание");
+            File.WriteAllBytes(Path.Combine(trailerDir, "trailer.mp4"), [0, 0, 0, 8, 0x66, 0x74, 0x79, 0x70]); // dummy mp4
+
+            var result = MetadataLinter.Lint(tempDir);
+            Assert.False(result.IsSuccess);
+            Assert.Contains(result.Errors, e => e.Contains("trailer_thumbnail.png"));
+            Assert.Contains(result.Warnings, w => w.Contains("возрастных рейтингов"));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
 }

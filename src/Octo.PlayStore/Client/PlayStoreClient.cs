@@ -381,6 +381,40 @@ public sealed class PlayStoreClient(HttpClient? httpClient = null)
         return parsed?.Images ?? [];
     }
 
+    public async Task<PlayAppDetails?> GetAppDetailsAsync(string packageName, string editId, string token, CancellationToken ct = default)
+    {
+        var uri = $"{ApiBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/details";
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<PlayAppDetails>(content);
+    }
+
+    public async Task UpdateAppDetailsAsync(string packageName, string editId, PlayAppDetails details, string token, CancellationToken ct = default)
+    {
+        var uri = $"{ApiBaseUrl}/{Uri.EscapeDataString(packageName)}/edits/{Uri.EscapeDataString(editId)}/details";
+        var json = JsonSerializer.Serialize(details, _ignoreNullOptions);
+        using var request = new HttpRequestMessage(HttpMethod.Patch, uri)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var respString = await response.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException($"Failed to update app details in Google Play: {response.StatusCode} - {respString}");
+        }
+    }
+
     public async Task<byte[]?> DownloadImageBytesAsync(string url, CancellationToken ct = default)
     {
         using var response = await _httpClient.GetAsync(url, ct);

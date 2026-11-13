@@ -92,7 +92,12 @@ public static class PackagingScaffolder
             WriteText(Path.Combine(winBase, "privacy.txt"), LocaleRegistry.GetDefaultPrivacyUrl());
 
             WriteImage(Path.Combine(winBase, "icon.png"), 300, 300);
+            WriteImage(Path.Combine(winBase, "icon_150.png"), 150, 150);
+            WriteImage(Path.Combine(winBase, "icon_71.png"), 71, 71);
             WriteImage(Path.Combine(winBase, "banner.png"), 1920, 1080);
+            WriteImage(Path.Combine(winBase, "boxart.png"), 1080, 1080);
+            WriteImage(Path.Combine(winBase, "poster.png"), 720, 1080);
+            WriteImage(Path.Combine(winBase, "branded_key_art.png"), 584, 800);
 
             var winScreenDir = Path.Combine(winBase, "screenshots");
             EnsureDir(winScreenDir);
@@ -202,7 +207,12 @@ public static class PackagingScaffolder
                 WriteText(Path.Combine(rel, "privacy.txt"), LocaleRegistry.GetDefaultPrivacyUrl());
 
                 WriteImage(Path.Combine(rel, "icon.png"), 300, 300);
+                WriteImage(Path.Combine(rel, "icon_150.png"), 150, 150);
+                WriteImage(Path.Combine(rel, "icon_71.png"), 71, 71);
                 WriteImage(Path.Combine(rel, "banner.png"), 1920, 1080);
+                WriteImage(Path.Combine(rel, "boxart.png"), 1080, 1080);
+                WriteImage(Path.Combine(rel, "poster.png"), 720, 1080);
+                WriteImage(Path.Combine(rel, "branded_key_art.png"), 584, 800);
 
                 var winScreenDir = Path.Combine(winDir, "screenshots");
                 if (!Directory.Exists(winScreenDir))

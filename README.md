@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/OctoCore-Dev/OctoPublisher/main/icon.svg" width="128" height="128" alt="Логотип OctoPublisher" />
   <h1>OctoPublisher</h1>
   <p>Универсальный высокопроизводительный движок автоматизации публикации приложений в Google Play Store и Microsoft Store с парадигмой <b>Store as Code</b>.</p>
 </div>

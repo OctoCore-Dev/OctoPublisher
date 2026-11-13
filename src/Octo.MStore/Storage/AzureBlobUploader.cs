@@ -11,6 +11,14 @@ public sealed class AzureBlobUploader
         string fileUploadUrl,
         string packagePath,
         Action<long, long, double>? onProgress = null,
+        CancellationToken ct = default) =>
+        await UploadPackageAsync(fileUploadUrl, packagePath, extraFiles: null, onProgress, ct).ConfigureAwait(false);
+
+    public async Task UploadPackageAsync(
+        string fileUploadUrl,
+        string packagePath,
+        IEnumerable<KeyValuePair<string, string>>? extraFiles,
+        Action<long, long, double>? onProgress = null,
         CancellationToken ct = default)
     {
         if (!File.Exists(packagePath))
@@ -18,14 +26,16 @@ public sealed class AzureBlobUploader
             throw new FileNotFoundException("Package file not found", packagePath);
         }
 
+        var extraList = extraFiles?.Where(kv => File.Exists(kv.Value)).ToList();
+        var hasExtraFiles = extraList != null && extraList.Count > 0;
         var zipPath = packagePath;
         var isTempZip = false;
 
-        if (!packagePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        if (hasExtraFiles || !packagePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
         {
             zipPath = Path.Combine(Path.GetTempPath(), $"octo_pkg_{Guid.NewGuid():N}.zip");
             isTempZip = true;
-            CreateZipArchive(packagePath, zipPath);
+            CreateZipArchive(packagePath, zipPath, extraList);
         }
 
         var normalizedUrl = fileUploadUrl.Replace("+", "%2B");
@@ -59,7 +69,7 @@ public sealed class AzureBlobUploader
         }
     }
 
-    private static void CreateZipArchive(string sourceFile, string targetZip)
+    private static void CreateZipArchive(string sourceFile, string targetZip, IEnumerable<KeyValuePair<string, string>>? extraFiles = null)
     {
         if (File.Exists(targetZip))
         {
@@ -69,6 +79,18 @@ public sealed class AzureBlobUploader
         using var archive = ZipFile.Open(targetZip, ZipArchiveMode.Create);
         var fileName = Path.GetFileName(sourceFile);
         _ = archive.CreateEntryFromFile(sourceFile, fileName, CompressionLevel.Optimal);
+
+        if (extraFiles != null)
+        {
+            foreach (var (entryName, filePath) in extraFiles)
+            {
+                if (File.Exists(filePath))
+                {
+                    var normalizedEntry = entryName.Replace('\\', '/').TrimStart('/');
+                    _ = archive.CreateEntryFromFile(filePath, normalizedEntry, CompressionLevel.Optimal);
+                }
+            }
+        }
     }
 
     private async Task UploadSingleBlockAsync(

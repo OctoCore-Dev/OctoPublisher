@@ -53,8 +53,14 @@ public sealed class DevCenterSubmission
     [JsonPropertyName("listings")]
     public Dictionary<string, DevCenterListing>? Listings { get; set; }
 
+    [JsonPropertyName("trailers")]
+    public List<DevCenterTrailer>? Trailers { get; set; }
+
     [JsonPropertyName("packageDeliveryOptions")]
     public PackageDeliveryOptions? PackageDeliveryOptions { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalData { get; set; }
 }
 
 public sealed class ApplicationPackage
@@ -73,10 +79,70 @@ public sealed class ApplicationPackage
 
     [JsonPropertyName("architecture")]
     public string? Architecture { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalData { get; set; }
 }
 
-public sealed class DevCenterListing
+public sealed class DevCenterImage
 {
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("fileName")]
+    public string? FileName { get; set; }
+
+    [JsonPropertyName("fileStatus")]
+    public string? FileStatus { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("imageType")]
+    public string? ImageType { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalData { get; set; }
+}
+
+public sealed class DevCenterTrailerAsset
+{
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("imageList")]
+    public List<DevCenterImage>? ImageList { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalData { get; set; }
+}
+
+public sealed class DevCenterTrailer
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("videoFileName")]
+    public string? VideoFileName { get; set; }
+
+    [JsonPropertyName("videoFileId")]
+    public string? VideoFileId { get; set; }
+
+    [JsonPropertyName("trailerAssets")]
+    public Dictionary<string, DevCenterTrailerAsset>? TrailerAssets { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalData { get; set; }
+}
+
+public sealed class DevCenterBaseListing
+{
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
     [JsonPropertyName("description")]
     public string? Description { get; set; }
 
@@ -86,8 +152,80 @@ public sealed class DevCenterListing
     [JsonPropertyName("features")]
     public List<string>? Features { get; set; }
 
-    [JsonPropertyName("title")]
-    public string? Title { get; set; }
+    [JsonPropertyName("keywords")]
+    public List<string>? Keywords { get; set; }
+
+    [JsonPropertyName("copyrightAndTrademarkInfo")]
+    public string? CopyrightAndTrademarkInfo { get; set; }
+
+    [JsonPropertyName("privacyPolicy")]
+    public string? PrivacyPolicy { get; set; }
+
+    [JsonPropertyName("supportContact")]
+    public string? SupportContact { get; set; }
+
+    [JsonPropertyName("websiteUrl")]
+    public string? WebsiteUrl { get; set; }
+
+    [JsonPropertyName("images")]
+    public List<DevCenterImage>? Images { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalData { get; set; }
+}
+
+public sealed class DevCenterListing
+{
+    [JsonPropertyName("baseListing")]
+    public DevCenterBaseListing? BaseListing { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalData { get; set; }
+
+    //прокси-свойства для обратной совместимости с кодом и тестами
+    [JsonIgnore]
+    public string? Description
+    {
+        get => BaseListing?.Description;
+        set
+        {
+            BaseListing ??= new DevCenterBaseListing();
+            BaseListing.Description = value;
+        }
+    }
+
+    [JsonIgnore]
+    public string? ReleaseNotes
+    {
+        get => BaseListing?.ReleaseNotes;
+        set
+        {
+            BaseListing ??= new DevCenterBaseListing();
+            BaseListing.ReleaseNotes = value;
+        }
+    }
+
+    [JsonIgnore]
+    public List<string>? Features
+    {
+        get => BaseListing?.Features;
+        set
+        {
+            BaseListing ??= new DevCenterBaseListing();
+            BaseListing.Features = value;
+        }
+    }
+
+    [JsonIgnore]
+    public string? Title
+    {
+        get => BaseListing?.Title;
+        set
+        {
+            BaseListing ??= new DevCenterBaseListing();
+            BaseListing.Title = value;
+        }
+    }
 }
 
 public sealed class PackageDeliveryOptions
